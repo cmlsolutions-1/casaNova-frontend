@@ -1,9 +1,12 @@
+//components/public-header.tsx
+
 "use client"
 
 import Link from "next/link"
 import { useState } from "react"
 import { Menu, X, Hotel } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import Image from "next/image"
 
 export function PublicHeader() {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -18,10 +21,19 @@ export function PublicHeader() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 glass-dark">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 lg:px-8">
-        <Link href="/" className="flex items-center gap-2">
-          <Hotel className="h-7 w-7 text-accent" />
+        <Link href="/" className="flex items-center gap-3">
+        <div className="relative h-10 w-10">
+            <Image
+              src="/LOGO.png"
+              alt="Casa Nova Hotel Campestre"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
+
           <span className="font-serif text-xl font-bold tracking-wide text-white">
-          Casa Nova
+            Casa Nova
           </span>
         </Link>
 

@@ -1,3 +1,4 @@
+//lib/mock-data.ts
 export interface Room {
   id: string
   type: "sencilla" | "doble" | "multiple" | "suite"
