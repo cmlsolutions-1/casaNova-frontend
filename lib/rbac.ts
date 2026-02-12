@@ -1,8 +1,8 @@
 // lib/rbac.ts
-export type Role = "SUPERADMIN" | "ADMIN" | "EMPLOYEE"
+export type Role = "SUPER_ADMIN" | "ADMIN" | "EMPLOYEE"
 
 export const ROLE_LABEL: Record<Role, string> = {
-  SUPERADMIN: "Super Administrador",
+  SUPER_ADMIN: "Super Administrador",
   ADMIN: "Administrador",
   EMPLOYEE: "Empleado",
 }
@@ -12,12 +12,12 @@ export const PERMISSIONS: {
   actions: Record<Role, string[]>
 } = {
   routes: {
-    SUPERADMIN: ["/admin", "/admin/rooms", "/admin/services", "/admin/reservations", "/admin/users"],
+    SUPER_ADMIN: ["/admin", "/admin/rooms", "/admin/services", "/admin/reservations", "/admin/users"],
     ADMIN: ["/admin", "/admin/rooms", "/admin/services", "/admin/reservations"],
     EMPLOYEE: ["/admin", "/admin/rooms", "/admin/reservations"],
   },
   actions: {
-    SUPERADMIN: ["CREATE_USER", "EDIT_USER", "DELETE_USER"],
+    SUPER_ADMIN: ["CREATE_USER", "EDIT_USER", "DELETE_USER"],
     ADMIN: [],
     EMPLOYEE: [],
   },

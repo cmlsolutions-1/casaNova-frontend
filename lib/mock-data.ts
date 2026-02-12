@@ -33,7 +33,7 @@ export interface User {
   email: string
   password: string
   name: string
-  role: "SUPERADMIN" | "ADMIN" | "EMPLOYEE"
+  role: "SUPER_ADMIN" | "ADMIN" | "EMPLOYEE"
 }
 
 export interface GuestInfo {
@@ -283,7 +283,7 @@ export const users: User[] = [
     email: "superadmin@grandluxe.com",
     password: "superadmin123",
     name: "Wilson Superadmin",
-    role: "SUPERADMIN",
+    role: "SUPER_ADMIN",
   },
   {
     id: "user-2",

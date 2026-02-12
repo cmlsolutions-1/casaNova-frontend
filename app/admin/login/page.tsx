@@ -25,8 +25,8 @@ export default function AdminLoginPage() {
     setError("")
     setLoading(true)
 
-    setTimeout(() => {
-      const success = login(email, password)
+    setTimeout(async () => {
+      const success = await login(email, password)
       if (success) {
         router.push("/admin")
       } else {
@@ -95,7 +95,7 @@ export default function AdminLoginPage() {
 
             <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground space-y-1">
               <p className="font-medium text-foreground">Credenciales de prueba:</p>
-              <p>SuperAdmin: superadmin@grandluxe.com / superadmin123</p>
+              <p>Super_Admin: superadmin@grandluxe.com / superadmin123</p>
               <p>Admin: admin@grandluxe.com / admin123</p>
               <p>Empleado: empleado@grandluxe.com / emp123</p>
             </div>

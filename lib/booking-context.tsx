@@ -7,6 +7,10 @@ import type { Room, GuestInfo, SelectedService, Reservation, Payment } from "./m
 import { rooms as defaultRooms, services as defaultServices, mockReservations, users as defaultUsers } from "./mock-data"
 import type { Service, User } from "./mock-data"
 
+import { loginService, logoutService } from "@/services/auth.service"
+import { listUsersService } from "@/services/user.service"
+import type { Role } from "@/lib/rbac"
+
 interface SearchParams {
   startDate: string
   endDate: string
@@ -43,8 +47,11 @@ interface BookingContextType {
   createReservation: (payment: { method: "card" | "pse" | "cash" }) => string
   updateReservationStatus: (id: string, status: Reservation["status"]) => void
   updateReservation: (id: string, data: Partial<Reservation>) => void
-  login: (email: string, password: string) => boolean
-  logout: () => void
+
+  //IMPLEMENTANDO CON BACKEND
+  login: (email: string, password: string) => Promise<boolean>
+  logout: () => Promise<void>
+
   addRoom: (room: Room) => void
   updateRoom: (id: string, data: Partial<Room>) => void
   addService: (service: Service) => void
@@ -52,6 +59,10 @@ interface BookingContextType {
   addUser: (user: User) => void
   resetBooking: () => void
 }
+
+
+
+
 
 const BookingContext = createContext<BookingContextType | null>(null)
 
@@ -98,6 +109,47 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
   const [booking, setBooking] = useState<BookingState>(defaultBooking)
   const [adminAuth, setAdminAuth] = useState<AdminAuth>({ isAuthenticated: false, user: null })
   const [hydrated, setHydrated] = useState(false)
+
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    try {
+      await loginService(email, password)
+  
+      // TEMPORAL: buscamos el user por email en /api/user
+      const all = await listUsersService()
+      const me = all.find(u => u.email.toLowerCase() === email.trim().toLowerCase())
+  
+      if (!me) return false
+  
+      setAdminAuth({
+        isAuthenticated: true,
+        user: {
+          id: me.id,
+          name: me.name,
+          email: me.email,
+          phone: me.phone,
+          password: "", // ya no guardes password
+          role: me.role as any,
+        } as any,
+      })
+  
+      // opcional: guarda users del panel si quieres
+      setUsers(all as any)
+  
+      return true
+    } catch (e) {
+      return false
+    }
+  }, [])
+
+  
+  //logout
+  const logout = useCallback(async () => {
+    try {
+      await logoutService()
+    } finally {
+      setAdminAuth({ isAuthenticated: false, user: null })
+    }
+  }, [])
 
   useEffect(() => {
     setRooms(loadFromStorage(STORAGE_KEYS.rooms, defaultRooms))
@@ -215,21 +267,6 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, ...data } : r)))
   }, [])
 
-  const login = useCallback(
-    (email: string, password: string): boolean => {
-      const user = users.find((u) => u.email === email && u.password === password)
-      if (user) {
-        setAdminAuth({ isAuthenticated: true, user })
-        return true
-      }
-      return false
-    },
-    [users],
-  )
-
-  const logout = useCallback(() => {
-    setAdminAuth({ isAuthenticated: false, user: null })
-  }, [])
 
   const addRoom = useCallback((room: Room) => {
     setRooms((prev) => [...prev, room])
