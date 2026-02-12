@@ -1,3 +1,5 @@
+//components/admin-sidebar.tsx
+
 "use client"
 
 import Link from "next/link"
@@ -17,6 +19,8 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
+import { canAccessRoute, ROLE_LABEL } from "@/lib/rbac"
+
 
 const adminLinks = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -32,11 +36,9 @@ export function AdminSidebar() {
   const { adminAuth, logout } = useBooking()
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  const isEmployee = adminAuth.user?.role === "EMPLOYEE"
+  const role = adminAuth.user?.role
+  const visibleLinks = role ? adminLinks.filter((l) => canAccessRoute(role, l.href)) : []
 
-  const visibleLinks = isEmployee
-    ? adminLinks.filter((l) => ["/admin", "/admin/rooms", "/admin/reservations"].includes(l.href))
-    : adminLinks
 
   const handleLogout = () => {
     logout()
@@ -50,8 +52,8 @@ export function AdminSidebar() {
         <div>
           <p className="font-serif text-lg font-semibold leading-tight">Casa Nova</p>
           <p className="text-xs text-primary-foreground/60">
-            {adminAuth.user?.role === "ADMIN" ? "Administrador" : "Empleado"}
-          </p>
+          {adminAuth.user?.role ? ROLE_LABEL[adminAuth.user.role] : ""}
+        </p>
         </div>
       </div>
 

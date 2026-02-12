@@ -1,3 +1,5 @@
+//app/admin/(panel)/users/page.tsx
+
 "use client"
 
 import React from "react"
@@ -16,15 +18,19 @@ import type { User } from "@/lib/mock-data"
 export default function AdminUsersPage() {
   const { users, addUser, adminAuth } = useBooking()
   const [creating, setCreating] = useState(false)
-  const isEmployee = adminAuth.user?.role === "EMPLOYEE"
+  const role = adminAuth.user?.role
+  const isSuperAdmin = role === "SUPERADMIN"
 
-  if (isEmployee) {
+  if (!isSuperAdmin) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground">No tienes acceso a esta seccion.</p>
+        <p className="text-muted-foreground">
+          No tienes acceso a esta sección.
+        </p>
       </div>
     )
   }
+
 
   return (
     <div className="space-y-6">
@@ -33,12 +39,14 @@ export default function AdminUsersPage() {
           <h1 className="font-serif text-3xl font-bold text-foreground">Usuarios</h1>
           <p className="text-muted-foreground">Gestiona los usuarios del sistema</p>
         </div>
-        <Dialog open={creating} onOpenChange={setCreating}>
-          <DialogTrigger asChild>
-            <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Empleado
-            </Button>
+        {isSuperAdmin && (
+          <Dialog open={creating} onOpenChange={setCreating}>
+            <DialogTrigger asChild>
+              <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
+                <Plus className="mr-2 h-4 w-4" />
+                Nuevo Empleado
+              </Button>
+
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -53,6 +61,7 @@ export default function AdminUsersPage() {
             />
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -66,11 +75,35 @@ export default function AdminUsersPage() {
                 <div className="flex-1 space-y-1">
                   <h3 className="font-semibold text-foreground">{user.name}</h3>
                   <p className="text-sm text-muted-foreground">{user.email}</p>
-                  <Badge variant={user.role === "ADMIN" ? "default" : "secondary"} className="mt-1">
-                    {user.role === "ADMIN" ? (
-                      <><ShieldCheck className="mr-1 h-3 w-3" />Admin</>
-                    ) : (
-                      <><Shield className="mr-1 h-3 w-3" />Empleado</>
+                  <Badge
+                    variant={
+                      user.role === "SUPERADMIN"
+                        ? "default"
+                        : user.role === "ADMIN"
+                        ? "secondary"
+                        : "outline"
+                    }
+                    className="mt-1"
+                  >
+                    {user.role === "SUPERADMIN" && (
+                      <>
+                        <ShieldCheck className="mr-1 h-3 w-3" />
+                        SuperAdmin
+                      </>
+                    )}
+
+                    {user.role === "ADMIN" && (
+                      <>
+                        <Shield className="mr-1 h-3 w-3" />
+                        Admin
+                      </>
+                    )}
+
+                    {user.role === "EMPLOYEE" && (
+                      <>
+                        <UserCircle className="mr-1 h-3 w-3" />
+                        Empleado
+                      </>
                     )}
                   </Badge>
                 </div>

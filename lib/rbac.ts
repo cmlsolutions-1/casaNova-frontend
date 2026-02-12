@@ -1,0 +1,32 @@
+// lib/rbac.ts
+export type Role = "SUPERADMIN" | "ADMIN" | "EMPLOYEE"
+
+export const ROLE_LABEL: Record<Role, string> = {
+  SUPERADMIN: "Super Administrador",
+  ADMIN: "Administrador",
+  EMPLOYEE: "Empleado",
+}
+
+export const PERMISSIONS: {
+  routes: Record<Role, string[]>
+  actions: Record<Role, string[]>
+} = {
+  routes: {
+    SUPERADMIN: ["/admin", "/admin/rooms", "/admin/services", "/admin/reservations", "/admin/users"],
+    ADMIN: ["/admin", "/admin/rooms", "/admin/services", "/admin/reservations"],
+    EMPLOYEE: ["/admin", "/admin/rooms", "/admin/reservations"],
+  },
+  actions: {
+    SUPERADMIN: ["CREATE_USER", "EDIT_USER", "DELETE_USER"],
+    ADMIN: [],
+    EMPLOYEE: [],
+  },
+}
+
+export function canAccessRoute(role: Role, href: string) {
+  return PERMISSIONS.routes[role].includes(href)
+}
+
+export function canDo(role: Role, action: string) {
+  return PERMISSIONS.actions[role].includes(action)
+}

@@ -1,3 +1,4 @@
+//app/admin/login/page.tsx
 "use client"
 
 import React from "react"
@@ -94,6 +95,7 @@ export default function AdminLoginPage() {
 
             <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground space-y-1">
               <p className="font-medium text-foreground">Credenciales de prueba:</p>
+              <p>SuperAdmin: superadmin@grandluxe.com / superadmin123</p>
               <p>Admin: admin@grandluxe.com / admin123</p>
               <p>Empleado: empleado@grandluxe.com / emp123</p>
             </div>
