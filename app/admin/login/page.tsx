@@ -93,12 +93,6 @@ export default function AdminLoginPage() {
               {loading ? "Ingresando..." : "Ingresar"}
             </Button>
 
-            <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground">Credenciales de prueba:</p>
-              <p>Super_Admin: superadmin@grandluxe.com / superadmin123</p>
-              <p>Admin: admin@grandluxe.com / admin123</p>
-              <p>Empleado: empleado@grandluxe.com / emp123</p>
-            </div>
           </form>
         </CardContent>
       </Card>

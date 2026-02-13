@@ -11,6 +11,11 @@ import { loginService, logoutService } from "@/services/auth.service"
 import { listUsersService } from "@/services/user.service"
 import type { Role } from "@/lib/rbac"
 
+import { authStorage } from "@/lib/auth-storage"
+import { decodeJwt } from "@/lib/jwt"
+import { refreshService } from "@/services/auth.service"
+
+
 interface SearchParams {
   startDate: string
   endDate: string
@@ -113,33 +118,36 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     try {
       await loginService(email, password)
+
+      // Forzamos refresh para obtener token con role (si el backend lo entrega ahí)
+    await refreshService()
+
+      // leer role del access token
+      const access = authStorage.getAccess()
+      const payload = access ? decodeJwt(access) : null
   
-      // TEMPORAL: buscamos el user por email en /api/user
-      const all = await listUsersService()
-      const me = all.find(u => u.email.toLowerCase() === email.trim().toLowerCase())
+      const role = payload?.role as Role | undefined
+      if (!role) throw new Error("No se pudo obtener el rol del token")
+
   
-      if (!me) return false
+    setAdminAuth({
+      isAuthenticated: true,
+      user: {
+        id: payload?.sub || "me",
+        name: email, // temporal (hasta tener /me)
+        email,
+        phone: "",
+        password: "",
+        role,
+      } as any,
+    })
   
-      setAdminAuth({
-        isAuthenticated: true,
-        user: {
-          id: me.id,
-          name: me.name,
-          email: me.email,
-          phone: me.phone,
-          password: "", // ya no guardes password
-          role: me.role as any,
-        } as any,
-      })
-  
-      // opcional: guarda users del panel si quieres
-      setUsers(all as any)
-  
-      return true
-    } catch (e) {
-      return false
-    }
-  }, [])
+    return true
+  } catch (e) {
+    console.error("LOGIN ERROR:", e)
+    return false
+  }
+}, [])
 
   
   //logout

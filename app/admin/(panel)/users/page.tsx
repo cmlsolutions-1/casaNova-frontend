@@ -4,6 +4,9 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { useBooking } from "@/lib/booking-context"
 import { listUsersService, createUserService, type BackendUser } from "@/services/user.service"
+import type { Role } from "@/lib/rbac"
+import { ROLE_LABEL } from "@/lib/rbac"
+
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -64,13 +67,13 @@ export default function AdminUsersPage() {
           <DialogTrigger asChild>
             <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
               <Plus className="mr-2 h-4 w-4" />
-              Nuevo Empleado
+              Nuevo Usuario
             </Button>
           </DialogTrigger>
 
           <DialogContent>
             <DialogHeader>
-              <DialogTitle className="font-serif text-foreground">Crear Empleado</DialogTitle>
+              <DialogTitle className="font-serif text-foreground">Crear Usuario</DialogTitle>
             </DialogHeader>
 
             <CreateUserForm
@@ -144,7 +147,7 @@ function CreateUserForm({
   onSave,
   onClose,
 }: {
-  onSave: (body: { name: string; email: string; phone: string; password: string; role: "EMPLOYEE" }) => Promise<void>
+  onSave: (body: { name: string; email: string; phone: string; password: string; role: Role }) => Promise<void>
   onClose: () => void
 }) {
   const [name, setName] = useState("")
@@ -153,13 +156,14 @@ function CreateUserForm({
   const [password, setPassword] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [role, setRole] = useState<Role>("EMPLOYEE")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
     try {
-      await onSave({ name, email, phone, password, role: "EMPLOYEE" })
+      await onSave({ name, email, phone, password, role })
     } catch (e: any) {
       setError(e?.message ?? "Error creando usuario")
     } finally {
@@ -185,6 +189,22 @@ function CreateUserForm({
         <Label className="text-foreground">Teléfono</Label>
         <Input value={phone} onChange={(e) => setPhone(e.target.value)} required />
       </div>
+      <div className="space-y-2">
+        
+        <Label className="text-foreground">Rol</Label>
+        <select
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          value={role}
+          onChange={(e) => setRole(e.target.value as Role)}
+          required
+        >
+          <option value="SUPER_ADMIN">{ROLE_LABEL.SUPER_ADMIN}</option>
+          <option value="ADMIN">{ROLE_LABEL.ADMIN}</option>
+          <option value="EMPLOYEE">{ROLE_LABEL.EMPLOYEE}</option>
+        </select>
+      </div>
+
 
       <div className="space-y-2">
         <Label className="text-foreground">Contraseña</Label>
@@ -202,7 +222,7 @@ function CreateUserForm({
           Cancelar
         </Button>
         <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90" disabled={saving}>
-          {saving ? "Creando..." : "Crear empleado"}
+          {saving ? "Creando..." : "Crear usuario"}
         </Button>
       </div>
     </form>
