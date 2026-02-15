@@ -40,6 +40,7 @@ interface AdminAuth {
 interface BookingContextType {
   booking: BookingState
   adminAuth: AdminAuth
+  hydrated: boolean
   rooms: Room[]
   services: Service[]
   reservations: Reservation[]
@@ -112,8 +113,11 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
   const [payments, setPayments] = useState<Payment[]>([])
   const [users, setUsers] = useState<User[]>(defaultUsers)
   const [booking, setBooking] = useState<BookingState>(defaultBooking)
-  const [adminAuth, setAdminAuth] = useState<AdminAuth>({ isAuthenticated: false, user: null })
+  const [adminAuth, setAdminAuth] = useState<AdminAuth>(() =>
+  loadFromStorage(STORAGE_KEYS.adminAuth, { isAuthenticated: false, user: null })
+    )
   const [hydrated, setHydrated] = useState(false)
+
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     try {
@@ -166,7 +170,6 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     setPayments(loadFromStorage(STORAGE_KEYS.payments, []))
     setUsers(loadFromStorage(STORAGE_KEYS.users, defaultUsers))
     setBooking(loadFromStorage(STORAGE_KEYS.booking, defaultBooking))
-    setAdminAuth(loadFromStorage(STORAGE_KEYS.adminAuth, { isAuthenticated: false, user: null }))
     setHydrated(true)
   }, [])
 
@@ -306,6 +309,7 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
         booking,
         adminAuth,
         rooms,
+        hydrated,
         services,
         reservations,
         payments,

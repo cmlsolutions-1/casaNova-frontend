@@ -20,8 +20,19 @@ export type CreateUserBody = {
   role: Role
 }
 
+export type UpdateUserBody = {
+  name: string
+  email: string
+  phone: string
+  role: Role
+}
+
 export async function listUsersService() {
   return apiFetch<BackendUser[]>("/api/user", { auth: true })
+}
+
+export async function getUserByIdService(id: string) {
+  return apiFetch<BackendUser>(`/api/user/${id}`, { auth: true })
 }
 
 export async function createUserService(body: CreateUserBody) {
@@ -29,5 +40,28 @@ export async function createUserService(body: CreateUserBody) {
     method: "POST",
     auth: true,
     body: JSON.stringify(body),
+  })
+}
+
+export async function updateUserService(id: string, body: UpdateUserBody) {
+  return apiFetch<BackendUser>(`/api/user/${id}`, {
+    method: "PUT",
+    auth: true,
+    body: JSON.stringify(body),
+  })
+}
+
+export async function deleteUserService(id: string) {
+  return apiFetch<{}>(`/api/user/${id}`, {
+    method: "DELETE",
+    auth: true,
+  })
+}
+
+// el endpoint "active" alterna estado
+export async function toggleUserActiveService(id: string) {
+  return apiFetch<{}>(`/api/user/active/${id}`, {
+    method: "PUT",
+    auth: true,
   })
 }

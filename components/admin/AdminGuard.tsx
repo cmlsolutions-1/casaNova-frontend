@@ -1,6 +1,7 @@
+//components/admin/AdminGuard.tsx
 "use client"
 
-import { useEffect } from "react"
+import React, { useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { useBooking } from "@/lib/booking-context"
 import { canAccessRoute } from "@/lib/rbac"
@@ -8,10 +9,10 @@ import { canAccessRoute } from "@/lib/rbac"
 export function AdminGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { adminAuth } = useBooking()
+  const { hydrated, adminAuth } = useBooking()
 
   useEffect(() => {
-    const role = adminAuth.user?.role
+    if (!hydrated) return
 
     // no autenticado
     if (!adminAuth.isAuthenticated) {
@@ -19,11 +20,23 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
       return
     }
 
-    // autenticado pero sin permiso
+    const role = adminAuth.user?.role
     if (role && !canAccessRoute(role, pathname)) {
-      router.replace("/admin") // o /admin/unauthorized si quieres
+      router.replace("/admin")
     }
-  }, [adminAuth, pathname, router])
+  }, [hydrated, adminAuth.isAuthenticated, adminAuth.user?.role, pathname, router])
+
+  // Mientras hidrata, NO redirijas, solo muestra loading
+  if (!hydrated) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <p className="text-muted-foreground">Cargando...</p>
+      </div>
+    )
+  }
+
+  // Si ya hidrató y no está autenticado, el effect ya redirige
+  if (!adminAuth.isAuthenticated) return null
 
   return <>{children}</>
 }
