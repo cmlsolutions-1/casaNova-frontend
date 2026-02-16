@@ -1,178 +1,276 @@
+//app/admin/(panel)/services/page.tsx
+
 "use client"
 
-import React from "react"
-
-import { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { useBooking } from "@/lib/booking-context"
+
+import {
+  listServicesService,
+  createServiceService,
+  updateServiceService,
+  updateServiceStatusService,
+  type BackendService,
+  type ServiceStatus,
+} from "@/services/service.service"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
+
 import { Plus, Pencil } from "lucide-react"
-import type { Service } from "@/lib/mock-data"
+
+function serviceImageByName(name: string) {
+  if (name.toLowerCase().includes("spa"))
+    return "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&h=600&fit=crop"
+
+  if (name.toLowerCase().includes("jacuzzi"))
+    return "https://images.unsplash.com/photo-1582582621959-48d27397dc7c?w=800&h=600&fit=crop"
+
+  return "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&h=600&fit=crop"
+}
 
 function ServiceForm({
   service,
   onSave,
   onClose,
 }: {
-  service?: Service
-  onSave: (data: Service) => void
+  service?: BackendService
+  onSave: (data: { name: string; description: string; price: number }) => Promise<void>
   onClose: () => void
 }) {
-  const [form, setForm] = useState<Service>(
-    service || {
-      id: `srv-${Date.now()}`,
-      name: "",
-      description: "",
-      price: 50,
-      icon: "Sparkles",
-      status: "active",
-      images: ["https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=300&fit=crop"],
-      hasSchedule: false,
-      maxAmount: 4,
-    }
-  )
+  const [name, setName] = useState(service?.name ?? "")
+  const [description, setDescription] = useState(service?.description ?? "")
+  const [price, setPrice] = useState(service?.price ?? 50)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSave(form)
-    onClose()
+    setSaving(true)
+    setError(null)
+
+    try {
+      await onSave({ name, description, price })
+      onClose()
+    } catch (e: any) {
+      setError(e?.message ?? "Error guardando servicio")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label className="text-foreground">Nombre</Label>
-          <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-foreground">Precio ($)</Label>
-          <Input type="number" min={0} value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
-        </div>
+      {error && <p className="text-red-500">{error}</p>}
+
+      <div className="space-y-2">
+        <Label>Nombre</Label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} required />
       </div>
 
       <div className="space-y-2">
-        <Label className="text-foreground">Descripcion</Label>
-        <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
+        <Label>Descripción</Label>
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} required />
       </div>
 
       <div className="space-y-2">
-        <Label className="text-foreground">Imagenes (URLs separadas por coma)</Label>
+        <Label>Precio ($)</Label>
         <Input
-          value={form.images.join(", ")}
-          onChange={(e) => setForm({ ...form, images: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+          type="number"
+          min={0}
+          value={price}
+          onChange={(e) => setPrice(Number(e.target.value))}
+          required
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label className="text-foreground">Cantidad maxima</Label>
-          <Input type="number" min={1} value={form.maxAmount} onChange={(e) => setForm({ ...form, maxAmount: Number(e.target.value) })} />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-foreground">Estado</Label>
-          <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Service["status"] })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Activo</SelectItem>
-              <SelectItem value="inactive">Inactivo</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Switch checked={form.hasSchedule} onCheckedChange={(v) => setForm({ ...form, hasSchedule: v })} />
-        <Label className="text-foreground">Requiere horario</Label>
-      </div>
-
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-        <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">{service ? "Guardar cambios" : "Crear servicio"}</Button>
+        <Button variant="outline" type="button" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? "Guardando..." : service ? "Guardar cambios" : "Crear servicio"}
+        </Button>
       </div>
     </form>
   )
 }
 
 export default function AdminServicesPage() {
-  const { services, addService, updateService, adminAuth } = useBooking()
-  const [editService, setEditService] = useState<Service | null>(null)
+  const { adminAuth } = useBooking()
+  const role = adminAuth.user?.role
+
+  const canManage = role === "SUPER_ADMIN" || role === "ADMIN"
+
+  const [services, setServices] = useState<BackendService[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [creating, setCreating] = useState(false)
-  const isEmployee = adminAuth.user?.role === "EMPLOYEE"
+  const [editingService, setEditingService] = useState<BackendService | null>(null)
+
+  const [changingId, setChangingId] = useState<string | null>(null)
+
+  const loadServices = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const data = await listServicesService()
+      setServices(data)
+    } catch (e: any) {
+      setError(e?.message ?? "Error cargando servicios")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!adminAuth.isAuthenticated) return
+    loadServices()
+  }, [adminAuth.isAuthenticated])
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-bold text-foreground">Servicios</h1>
-          <p className="text-muted-foreground">Gestiona los servicios adicionales</p>
+          <h1 className="font-serif text-3xl font-bold">Servicios</h1>
+          <p className="text-muted-foreground">Gestiona los servicios adicionales del hotel</p>
         </div>
-        {!isEmployee && (
+
+        {canManage && (
           <Dialog open={creating} onOpenChange={setCreating}>
             <DialogTrigger asChild>
-              <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
+              <Button>
                 <Plus className="mr-2 h-4 w-4" />
-                Nuevo Servicio
+                Nuevo servicio
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+
+            <DialogContent>
               <DialogHeader>
-                <DialogTitle className="font-serif text-foreground">Crear Servicio</DialogTitle>
+                <DialogTitle>Crear servicio</DialogTitle>
               </DialogHeader>
-              <ServiceForm onSave={(s) => addService(s)} onClose={() => setCreating(false)} />
+
+              <ServiceForm
+                onSave={async (body) => {
+                  await createServiceService(body)
+                  await loadServices()
+                }}
+                onClose={() => setCreating(false)}
+              />
             </DialogContent>
           </Dialog>
         )}
       </div>
 
+      {/* States */}
+      {loading && <p>Cargando...</p>}
+      {error && <p className="text-red-500">{error}</p>}
+
+      {/* Grid */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {services.map((svc) => (
-          <Card key={svc.id} className="overflow-hidden border-border">
-            <div className="relative h-36">
-              <img src={svc.images[0] || "/placeholder.svg"} alt={svc.name} className="h-full w-full object-cover" />
-              <Badge className="absolute top-2 right-2" variant={svc.status === "active" ? "default" : "secondary"}>
-                {svc.status === "active" ? "Activo" : "Inactivo"}
-              </Badge>
-            </div>
-            <CardContent className="p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="font-serif font-semibold text-foreground">{svc.name}</h3>
-                <span className="font-bold text-accent">${svc.price}</span>
+        {services.map((svc) => {
+          const img = serviceImageByName(svc.name)
+          const isActive = svc.status === "ACTIVE"
+
+          return (
+            <Card key={svc.id} className="overflow-hidden border-border">
+              {/* Image */}
+              <div className="relative h-36">
+                <img src={img} alt={svc.name} className="h-full w-full object-cover" />
+
+                <Badge
+                  className={`absolute top-2 right-2 ${
+                    isActive
+                      ? "bg-green-100 text-green-700 border border-green-300"
+                      : "bg-red-100 text-red-700 border border-red-300"
+                  }`}
+                >
+                  {isActive ? "Activo" : "Inactivo"}
+                </Badge>
               </div>
-              <p className="text-xs text-muted-foreground line-clamp-2">{svc.description}</p>
-              {!isEmployee && (
-                <Dialog open={editService?.id === svc.id} onOpenChange={(open) => !open && setEditService(null)}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-full mt-1 bg-transparent" onClick={() => setEditService(svc)}>
+
+              {/* Content */}
+              <CardContent className="p-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold">{svc.name}</h3>
+                  <span className="font-bold text-accent">${svc.price}</span>
+                </div>
+
+                <p className="text-xs text-muted-foreground line-clamp-2">{svc.description}</p>
+
+                {/* Actions */}
+                {canManage && (
+                  <div className="mt-3 flex justify-center gap-2 flex-wrap">
+                    {/* Edit */}
+                    <Button size="sm" variant="outline" onClick={() => setEditingService(svc)}>
                       <Pencil className="mr-2 h-3 w-3" />
                       Editar
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                      <DialogTitle className="font-serif text-foreground">Editar Servicio</DialogTitle>
-                    </DialogHeader>
-                    {editService && (
-                      <ServiceForm
-                        service={editService}
-                        onSave={(data) => updateService(data.id, data)}
-                        onClose={() => setEditService(null)}
-                      />
-                    )}
-                  </DialogContent>
-                </Dialog>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+
+                    {/* Toggle status */}
+                    <Button
+                      size="sm"
+                      className={
+                        isActive
+                          ? "bg-red-600 text-white hover:bg-red-700"
+                          : "bg-green-600 text-white hover:bg-green-700"
+                      }
+                      disabled={changingId === svc.id}
+                      onClick={async () => {
+                        setChangingId(svc.id)
+                        try {
+                          await updateServiceStatusService(
+                            svc.id,
+                            isActive ? "INACTIVE" : "ACTIVE",
+                          )
+                          await loadServices()
+                        } finally {
+                          setChangingId(null)
+                        }
+                      }}
+                    >
+                      {changingId === svc.id
+                        ? "Procesando..."
+                        : isActive
+                        ? "Inactivar"
+                        : "Activar"}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
+
+      {/* Edit Dialog global */}
+      <Dialog open={!!editingService} onOpenChange={(open) => !open && setEditingService(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar servicio</DialogTitle>
+          </DialogHeader>
+
+          {editingService && (
+            <ServiceForm
+              service={editingService}
+              onSave={async (body) => {
+                await updateServiceService(editingService.id, body)
+                await loadServices()
+              }}
+              onClose={() => setEditingService(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

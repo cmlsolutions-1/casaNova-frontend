@@ -3,13 +3,13 @@
 
 import React, { useEffect, useMemo, useState } from "react"
 import { useBooking } from "@/lib/booking-context"
-import { 
-  listUsersService, 
-  createUserService, 
-  updateUserService, 
-  deleteUserService, 
-  toggleUserActiveService, 
-  type BackendUser 
+import {
+  listUsersService,
+  createUserService,
+  updateUserService,
+  activateUserService,
+  deactivateUserService,
+  type BackendUser,
 } from "@/services/user.service"
 
 import type { Role } from "@/lib/rbac"
@@ -38,8 +38,8 @@ export default function AdminUsersPage() {
 
   const [editing, setEditing] = useState(false)
   const [editingUser, setEditingUser] = useState<BackendUser | null>(null)
-  const [togglingId, setTogglingId] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [changingId, setChangingId] = useState<string | null>(null)
+  
 
 
 
@@ -136,10 +136,10 @@ export default function AdminUsersPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {users.map((user) => {
-        const isSelf =
-          adminAuth.user?.email?.toLowerCase() === user.email.toLowerCase()
-
+        const isSelf = adminAuth.user?.email?.toLowerCase() === user.email.toLowerCase()
         const isProtected = user.role === "SUPER_ADMIN" || isSelf
+        const isActive = user.status === "ACTIVE"
+        
 
         return (
           
@@ -184,66 +184,67 @@ export default function AdminUsersPage() {
                   )}
                 </Badge>
 
-                <Badge variant={user.status === "ACTIVE" ? "default" : "secondary"}>
+                <Badge
+                  className={
+                    user.status === "ACTIVE"
+                      ? "bg-green-100 text-green-700 border border-green-300"
+                      : "bg-red-100 text-red-700 border border-red-300"
+                  }
+                >
                   {user.status === "ACTIVE" ? "Activo" : "Inactivo"}
                 </Badge>
+
               </div>
 
 
                 </div>
               </div>
               {/* Actions */}         
-             <div className="mt-4 flex justify-center gap-2 flex-wrap">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setEditingUser(user)
-                    setEditing(true)
-                  }}
-                >
-                  Editar
-                </Button>
-
+              <div className="mt-4 flex justify-center gap-2 flex-wrap">
 
               <Button
-                  variant="outline"
-                  disabled={isProtected || togglingId === user.id}
-                  title={isProtected ? "No puedes inactivar/eliminar este usuario." : undefined}
-                  onClick={async () => {
-                    setError(null)
-                    setTogglingId(user.id)
-                    try {
-                      await toggleUserActiveService(user.id)
-                      await loadUsers()
-                    } catch (e: any) {
-                      setError(e?.message ?? "Error cambiando estado")
-                    } finally {
-                      setTogglingId(null)
-                    }
-                  }}
-                >
-                  {user.status === "ACTIVE" ? "Inactivar" : "Activar"}
-                </Button>
+                variant="outline"
+                onClick={() => {
+                  setEditingUser(user)
+                  setEditing(true)
+                }}
+              >
+                Editar
+              </Button>
 
               <Button
-                variant="destructive"
-                disabled={deletingId === user.id}
+                className={
+                  isActive
+                    ? "bg-red-600 text-white hover:bg-red-700"
+                    : "bg-green-600 text-white hover:bg-green-700"
+                }
+                disabled={isProtected || changingId === user.id}
                 onClick={async () => {
-                  const ok = window.confirm(`¿Seguro que deseas eliminar a ${user.name}?`)
-                  if (!ok) return
-
-                  setDeletingId(user.id)
+                  setError(null)
+                  setChangingId(user.id)
                   try {
-                    await deleteUserService(user.id)
+                    if (isActive) {
+                      await deactivateUserService(user.id) // DELETE
+                    } else {
+                      await activateUserService(user.id) // PUT /active
+                    }
                     await loadUsers()
+                  } catch (e: any) {
+                    setError(e?.message ?? "Error cambiando estado")
                   } finally {
-                    setDeletingId(null)
+                    setChangingId(null)
                   }
                 }}
               >
-                Eliminar
+                {changingId === user.id
+                  ? "Procesando..."
+                  : isActive
+                  ? "Inactivar"
+                  : "Activar"}
               </Button>
+
             </div>
+
             </CardContent>
           </Card>
           )

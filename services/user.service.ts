@@ -51,17 +51,17 @@ export async function updateUserService(id: string, body: UpdateUserBody) {
   })
 }
 
-export async function deleteUserService(id: string) {
-  return apiFetch<{}>(`/api/user/${id}`, {
-    method: "DELETE",
+export async function activateUserService(id: string) {
+  return apiFetch<{}>(`/api/user/active/${id}`, {
+    method: "PUT",
     auth: true,
   })
 }
 
-// el endpoint "active" alterna estado
-export async function toggleUserActiveService(id: string) {
-  return apiFetch<{}>(`/api/user/active/${id}`, {
-    method: "PUT",
+// INACTIVAR = DELETE
+export async function deactivateUserService(id: string) {
+  return apiFetch<{}>(`/api/user/${id}`, {
+    method: "DELETE",
     auth: true,
   })
 }
