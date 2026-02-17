@@ -12,8 +12,8 @@ export const PERMISSIONS: {
   actions: Record<Role, string[]>
 } = {
   routes: {
-    SUPER_ADMIN: ["/admin", "/admin/rooms", "/admin/services", "/admin/reservations", "/admin/users"],
-    ADMIN: ["/admin", "/admin/rooms", "/admin/services", "/admin/reservations"],
+    SUPER_ADMIN: ["/admin", "/admin/rooms", "/admin/services", "/admin/amenities", "/admin/reservations", "/admin/users"],
+    ADMIN: ["/admin", "/admin/rooms", "/admin/services", "/admin/amenities","/admin/reservations"],
     EMPLOYEE: ["/admin", "/admin/rooms", "/admin/reservations"],
   },
   actions: {

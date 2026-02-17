@@ -16,6 +16,7 @@ import {
   Hotel,
   Menu,
   X,
+  ListChecks,
 } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
@@ -26,6 +27,7 @@ const adminLinks = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/rooms", label: "Habitaciones", icon: BedDouble },
   { href: "/admin/services", label: "Servicios", icon: Sparkles },
+  { href: "/admin/amenities", label: "Amenidades", icon: ListChecks },
   { href: "/admin/reservations", label: "Reservas", icon: CalendarCheck },
   { href: "/admin/users", label: "Usuarios", icon: Users },
 ]

@@ -3,6 +3,7 @@
 
 import React, { useEffect, useMemo, useState } from "react"
 import { useBooking } from "@/lib/booking-context"
+import { listAmenitiesService, type BackendAmenity } from "@/services/amenity.service"
 import {
   listRoomsService,
   createRoomService,
@@ -55,29 +56,37 @@ function RoomForm({
   onSave: (data: Omit<BackendRoom, "id">) => Promise<void>
   onClose: () => void
 }) {
+  const [amenities, setAmenities] = useState<BackendAmenity[]>([])
+
   const [form, setForm] = useState<Omit<BackendRoom, "id">>(
     room
       ? {
           type: room.type,
           nameRoom: room.nameRoom,
+          description: room.description,
           singleBeds: room.singleBeds,
           doubleBeds: room.doubleBeds,
           capacity: room.capacity,
           price: room.price,
           status: room.status,
           isBusy: room.isBusy,
+          amenityIds: room.amenityIds ?? [],
         }
       : {
           type: "SIMPLE",
           nameRoom: "",
+          description: "",
           singleBeds: 1,
           doubleBeds: 0,
           capacity: 1,
           price: 100,
           status: "ACTIVE",
           isBusy: false,
+          amenityIds: [],
         },
   )
+
+
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -96,6 +105,38 @@ function RoomForm({
     }
   }
 
+  useEffect(() => {
+    if (!room) return
+  
+    setForm({
+      type: room.type,
+      nameRoom: room.nameRoom,
+      description: room.description,
+      singleBeds: room.singleBeds,
+      doubleBeds: room.doubleBeds,
+      capacity: room.capacity,
+      price: room.price,
+      status: room.status,
+      isBusy: room.isBusy,
+      amenityIds: room.amenityIds ?? [],
+    })
+  }, [room])
+  
+
+  useEffect(() => {
+    async function loadAmenities() {
+      try {
+        const data = await listAmenitiesService()
+        setAmenities(data.filter((a) => a.status === "ACTIVE"))
+      } catch {
+        console.log("No se pudieron cargar amenidades")
+      }
+    }
+  
+    loadAmenities()
+  }, [])
+  
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
       {error && <p className="text-red-500">{error}</p>}
@@ -110,6 +151,16 @@ function RoomForm({
             required
           />
         </div>
+        <div className="space-y-2">
+        <Label className="text-foreground">Descripción</Label>
+        <Input
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder="Ej: Habitación con vista al mar"
+          required
+        />
+      </div>
+
 
         <div className="space-y-2">
           <Label className="text-foreground">Tipo</Label>
@@ -157,6 +208,7 @@ function RoomForm({
           />
         </div>
 
+
         <div className="space-y-2">
           <Label className="text-foreground">Precio/noche ($)</Label>
           <Input
@@ -167,6 +219,45 @@ function RoomForm({
           />
         </div>
       </div>
+     <div className="space-y-2">
+          <Label className="text-foreground">Amenidades</Label>
+
+          <div className="max-h-40 overflow-y-auto rounded-md border p-3 space-y-2">
+            {amenities.map((a) => {
+              const checked = form.amenityIds.includes(a.id)
+
+              return (
+                <label
+                  key={a.id}
+                  className="flex items-center gap-2 text-sm cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      setForm((prev) => ({
+                        ...prev,
+                        amenityIds: checked
+                          ? prev.amenityIds.filter((id) => id !== a.id)
+                          : [...prev.amenityIds, a.id],
+                      }))
+                    }}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+
+                  <span>{a.name}</span>
+                </label>
+              )
+            })}
+          </div>
+
+          {form.amenityIds.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Selecciona una o varias amenidades.
+            </p>
+          )}
+        </div>
+
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
@@ -213,6 +304,8 @@ export default function AdminRoomsPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [changingId, setChangingId] = useState<string | null>(null)
+  const [amenitiesMap, setAmenitiesMap] = useState<Record<string, string>>({})
+
 
   const loadRooms = async () => {
     setLoading(true)
@@ -228,10 +321,31 @@ export default function AdminRoomsPage() {
   }
 
   useEffect(() => {
-    if (!adminAuth.isAuthenticated) return
-    loadRooms()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    async function loadAll() {
+      if (!adminAuth.isAuthenticated) return
+  
+      setLoading(true)
+  
+      try {
+        const roomsData = await listRoomsService()
+        setRooms(roomsData)
+  
+        const amenitiesData = await listAmenitiesService()
+        const map = Object.fromEntries(
+          amenitiesData.map((a) => [a.id, a.name])
+        )
+        setAmenitiesMap(map)
+      } catch (e) {
+        setError("Error cargando datos")
+      } finally {
+        setLoading(false)
+      }
+    }
+  
+    loadAll()
   }, [adminAuth.isAuthenticated])
+  
+  
 
   return (
     <div className="space-y-6">
@@ -331,10 +445,15 @@ export default function AdminRoomsPage() {
                 </div>
 
                 <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                {/* Descripción */}
+                <p className="text-sm text-muted-foreground line-clamp-2">
+                  {room.description}
+                </p>
                   <div className="flex items-center gap-1">
                     <Users className="h-4 w-4" />
                     <span>{room.capacity}</span>
                   </div>
+
 
                   <div className="flex items-center gap-1">
                     <BedSingle className="h-4 w-4" />
@@ -346,6 +465,17 @@ export default function AdminRoomsPage() {
                     <span>{room.doubleBeds}</span>
                   </div>
                 </div>
+
+                {room.amenityIds?.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {room.amenityIds.map((id) => (
+                    <Badge key={id} variant="outline" className="text-xs">
+                      {amenitiesMap[id] ?? "Desconocida"}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
 
 
                 {canManageRooms && (

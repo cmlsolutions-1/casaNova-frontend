@@ -8,12 +8,14 @@ export type BackendRoom = {
   id: string
   type: RoomType
   nameRoom: string
+  description: string
   singleBeds: number
   doubleBeds: number
   capacity: number
   price: number
   status: RoomStatus
   isBusy: boolean
+  amenityIds: string[]
 }
 
 // Crear / Actualizar
