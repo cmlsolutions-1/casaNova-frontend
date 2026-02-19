@@ -2,6 +2,7 @@
 import { apiFetch } from "@/lib/api"
 
 export type ServiceStatus = "ACTIVE" | "INACTIVE"
+export type ServiceBillingType = "FIXED" | "HOURLY"
 
 export type BackendService = {
   id: string
@@ -9,12 +10,14 @@ export type BackendService = {
   description: string
   price: number
   status: ServiceStatus
+  billingType: ServiceBillingType
 }
 
 export type CreateServiceBody = {
   name: string
   description: string
   price: number
+  billingType: ServiceBillingType
 }
 
 export async function listServicesService() {

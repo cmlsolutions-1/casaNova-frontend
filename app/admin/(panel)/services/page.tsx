@@ -22,6 +22,10 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import type { ServiceBillingType } from "@/services/service.service"
+
+
 import { Plus, Pencil } from "lucide-react"
 
 function serviceImageByName(name: string) {
@@ -40,7 +44,7 @@ function ServiceForm({
   onClose,
 }: {
   service?: BackendService
-  onSave: (data: { name: string; description: string; price: number }) => Promise<void>
+  onSave: (data: { name: string; description: string; price: number; billingType: ServiceBillingType }) => Promise<void>
   onClose: () => void
 }) {
   const [name, setName] = useState(service?.name ?? "")
@@ -49,6 +53,16 @@ function ServiceForm({
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [billingType, setBillingType] = useState<ServiceBillingType>(service?.billingType ?? "FIXED")
+
+  useEffect(() => {
+    if (!service) return
+    setName(service.name)
+    setDescription(service.description)
+    setPrice(service.price)
+    setBillingType(service.billingType)
+  }, [service])
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -56,7 +70,7 @@ function ServiceForm({
     setError(null)
 
     try {
-      await onSave({ name, description, price })
+      await onSave({ name, description, price, billingType })
       onClose()
     } catch (e: any) {
       setError(e?.message ?? "Error guardando servicio")
@@ -78,6 +92,20 @@ function ServiceForm({
         <Label>Descripción</Label>
         <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} required />
       </div>
+
+      <div className="space-y-2">
+        <Label>Tipo de cobro</Label>
+        <Select value={billingType} onValueChange={(v) => setBillingType(v as ServiceBillingType)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Selecciona..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="FIXED">Fijo</SelectItem>
+            <SelectItem value="HOURLY">Por hora</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
 
       <div className="space-y-2">
         <Label>Precio ($)</Label>
@@ -200,6 +228,12 @@ export default function AdminServicesPage() {
 
               {/* Content */}
               <CardContent className="p-4 space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="text-xs">
+                  {svc.billingType === "HOURLY" ? "Por hora" : "Fijo"}
+                </Badge>
+              </div>
+
                 <div className="flex justify-between items-center">
                   <h3 className="font-semibold">{svc.name}</h3>
                   <span className="font-bold text-accent">${svc.price}</span>
