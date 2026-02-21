@@ -8,6 +8,7 @@ export type BackendService = {
   id: string
   name: string
   description: string
+  decription?: string
   price: number
   status: ServiceStatus
   billingType: ServiceBillingType
@@ -16,6 +17,7 @@ export type BackendService = {
 export type CreateServiceBody = {
   name: string
   description: string
+  decription?: string
   price: number
   billingType: ServiceBillingType
 }

@@ -6,6 +6,7 @@ import { useBooking } from "@/lib/booking-context"
 import { listAmenitiesService, type BackendAmenity } from "@/services/amenity.service"
 import {
   listRoomsService,
+  getRoomService,
   createRoomService,
   updateRoomService,
   updateRoomStatusService,
@@ -480,7 +481,14 @@ export default function AdminRoomsPage() {
 
                 {canManageRooms && (
                   <div className="mt-3 flex flex-wrap justify-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setEditingRoom(room)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const full = await getRoomService(room.id) 
+                        setEditingRoom(full)
+                      }}
+                    >
                       <Pencil className="mr-2 h-3 w-3" />
                       Editar
                     </Button>

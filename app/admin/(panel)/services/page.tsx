@@ -151,7 +151,12 @@ export default function AdminServicesPage() {
 
     try {
       const data = await listServicesService()
-      setServices(data)
+      const normalized = data.map((s: any) => ({
+        ...s,
+        // SIEMPRE garantiza description
+        description: s.description ?? s.decription ?? "",
+      }))
+      setServices(normalized)
     } catch (e: any) {
       setError(e?.message ?? "Error cargando servicios")
     } finally {
@@ -239,7 +244,7 @@ export default function AdminServicesPage() {
                   <span className="font-bold text-accent">${svc.price}</span>
                 </div>
 
-                <p className="text-xs text-muted-foreground line-clamp-2">{svc.description}</p>
+                <p className="text-xs text-muted-foreground line-clamp-2">{svc.decription}</p>
 
                 {/* Actions */}
                 {canManage && (

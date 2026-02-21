@@ -1,3 +1,4 @@
+//app/rooms/[id]/page.tsx
 "use client"
 
 import { use, useState } from "react"

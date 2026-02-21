@@ -1,3 +1,4 @@
+//components/services-section.tsx
 "use client"
 
 import React from "react"
@@ -27,7 +28,7 @@ export function ServicesSection() {
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
             Disfrute de una gama completa de servicios disenados para hacer de su
-            estancia una experiencia inolvidable.
+            estancia una experiencia inolvidable agregados a tu reserva.
           </p>
         </div>
 
