@@ -1,0 +1,9 @@
+NOTAS DE FINCA HOTEL
+
+- la sesión expiro, no esta funcionando el refresh token
+- vincular lo del enpoind para las imágenes
+- definir lo de los servicios y vincularlo con las imágenes
+
+- luego de todo lo anterior, ahí si mostrar la información en la pagina incial del cliente
+
+- poner una opción de verificar reserva con la cedula y el # de la reserva

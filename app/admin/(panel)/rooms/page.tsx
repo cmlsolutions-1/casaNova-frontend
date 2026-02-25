@@ -1,7 +1,7 @@
 //app/admin/(panel)/rooms/page.tsx
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { useBooking } from "@/lib/booking-context"
 import { listAmenitiesService, type BackendAmenity } from "@/services/amenity.service"
 import {
@@ -14,6 +14,7 @@ import {
   type BackendRoom,
   type RoomType,
   type RoomStatus,
+  type RoomUpsertBody,
 } from "@/services/room.service"
 
 import { Button } from "@/components/ui/button"
@@ -24,25 +25,21 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
-import { 
-  Plus, 
-  Pencil,
-  Users, 
-  BedDouble,
-  BedSingle
- } from "lucide-react"
 
-
-
+import { Plus, Pencil, Users, BedDouble, BedSingle } from "lucide-react"
 
 const TYPE_LABEL: Record<RoomType, string> = {
   SIMPLE: "Sencilla",
   DOUBLE: "Doble",
+  TRIPLE: "Triple",
+  QUADRUPLE: "Cuádruple",
+  QUINTUPLE: "Quíntuple",
+  SEXTUPLE: "Séxtuple",
   VIP: "VIP",
 }
 
 function roomImageByType(type: RoomType) {
-  // 🔥 imágenes quemadas por ahora
+  // 🔥 imágenes quemadas por ahora (fallback)
   if (type === "VIP") return "https://images.unsplash.com/photo-1541971875076-8f970d573be6?w=800&h=600&fit=crop"
   if (type === "DOUBLE") return "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&h=600&fit=crop"
   return "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&h=600&fit=crop"
@@ -54,12 +51,12 @@ function RoomForm({
   onClose,
 }: {
   room?: BackendRoom
-  onSave: (data: Omit<BackendRoom, "id">) => Promise<void>
+  onSave: (data: RoomUpsertBody) => Promise<void>
   onClose: () => void
 }) {
   const [amenities, setAmenities] = useState<BackendAmenity[]>([])
 
-  const [form, setForm] = useState<Omit<BackendRoom, "id">>(
+  const [form, setForm] = useState<RoomUpsertBody>(
     room
       ? {
           type: room.type,
@@ -67,11 +64,14 @@ function RoomForm({
           description: room.description,
           singleBeds: room.singleBeds,
           doubleBeds: room.doubleBeds,
+          cabin: room.cabin ?? 0,
+          extraDouble: room.extraDouble ?? 0,
           capacity: room.capacity,
           price: room.price,
           status: room.status,
           isBusy: room.isBusy,
-          amenityIds: room.amenityIds ?? [],
+          amenityIds: room.amenities?.map((a) => a.id) ?? [],
+          imagesIds: [], // ⚠️ por ahora: el GET devuelve images (urls) pero no ids
         }
       : {
           type: "SIMPLE",
@@ -79,18 +79,52 @@ function RoomForm({
           description: "",
           singleBeds: 1,
           doubleBeds: 0,
+          cabin: 0,
+          extraDouble: 0,
           capacity: 1,
           price: 100,
           status: "ACTIVE",
           isBusy: false,
           amenityIds: [],
+          imagesIds: [],
         },
   )
 
-
-
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Si cambia "room" (por ejemplo al abrir editar con getRoomService),
+  // sincronizamos el form con lo nuevo.
+  useEffect(() => {
+    if (!room) return
+    setForm({
+      type: room.type,
+      nameRoom: room.nameRoom,
+      description: room.description,
+      singleBeds: room.singleBeds,
+      doubleBeds: room.doubleBeds,
+      cabin: room.cabin ?? 0,
+      extraDouble: room.extraDouble ?? 0,
+      capacity: room.capacity,
+      price: room.price,
+      status: room.status,
+      isBusy: room.isBusy,
+      amenityIds: room.amenities?.map((a) => a.id) ?? [],
+      imagesIds: [],
+    })
+  }, [room])
+
+  useEffect(() => {
+    async function loadAmenities() {
+      try {
+        const data = await listAmenitiesService()
+        setAmenities(data.filter((a) => a.status === "ACTIVE"))
+      } catch {
+        console.log("No se pudieron cargar amenidades")
+      }
+    }
+    loadAmenities()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -106,38 +140,6 @@ function RoomForm({
     }
   }
 
-  useEffect(() => {
-    if (!room) return
-  
-    setForm({
-      type: room.type,
-      nameRoom: room.nameRoom,
-      description: room.description,
-      singleBeds: room.singleBeds,
-      doubleBeds: room.doubleBeds,
-      capacity: room.capacity,
-      price: room.price,
-      status: room.status,
-      isBusy: room.isBusy,
-      amenityIds: room.amenityIds ?? [],
-    })
-  }, [room])
-  
-
-  useEffect(() => {
-    async function loadAmenities() {
-      try {
-        const data = await listAmenitiesService()
-        setAmenities(data.filter((a) => a.status === "ACTIVE"))
-      } catch {
-        console.log("No se pudieron cargar amenidades")
-      }
-    }
-  
-    loadAmenities()
-  }, [])
-  
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
       {error && <p className="text-red-500">{error}</p>}
@@ -152,16 +154,16 @@ function RoomForm({
             required
           />
         </div>
-        <div className="space-y-2">
-        <Label className="text-foreground">Descripción</Label>
-        <Input
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-          placeholder="Ej: Habitación con vista al mar"
-          required
-        />
-      </div>
 
+        <div className="space-y-2">
+          <Label className="text-foreground">Descripción</Label>
+          <Input
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            placeholder="Ej: Habitación con vista al mar"
+            required
+          />
+        </div>
 
         <div className="space-y-2">
           <Label className="text-foreground">Tipo</Label>
@@ -172,13 +174,17 @@ function RoomForm({
             <SelectContent>
               <SelectItem value="SIMPLE">Sencilla</SelectItem>
               <SelectItem value="DOUBLE">Doble</SelectItem>
+              <SelectItem value="TRIPLE">Triple</SelectItem>
+              <SelectItem value="QUADRUPLE">Cuádruple</SelectItem>
+              <SelectItem value="QUINTUPLE">Quíntuple</SelectItem>
+              <SelectItem value="SEXTUPLE">Séxtuple</SelectItem>
               <SelectItem value="VIP">VIP</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-2">
           <Label className="text-foreground">Camas sencillas</Label>
           <Input
@@ -200,6 +206,28 @@ function RoomForm({
         </div>
 
         <div className="space-y-2">
+          <Label className="text-foreground">Cabaña</Label>
+          <Input
+            type="number"
+            min={0}
+            value={form.cabin}
+            onChange={(e) => setForm({ ...form, cabin: Number(e.target.value) })}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-foreground">Doble extra</Label>
+          <Input
+            type="number"
+            min={0}
+            value={form.extraDouble}
+            onChange={(e) => setForm({ ...form, extraDouble: Number(e.target.value) })}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-2">
           <Label className="text-foreground">Capacidad</Label>
           <Input
             type="number"
@@ -208,7 +236,6 @@ function RoomForm({
             onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })}
           />
         </div>
-
 
         <div className="space-y-2">
           <Label className="text-foreground">Precio/noche ($)</Label>
@@ -219,48 +246,7 @@ function RoomForm({
             onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
           />
         </div>
-      </div>
-     <div className="space-y-2">
-          <Label className="text-foreground">Amenidades</Label>
 
-          <div className="max-h-40 overflow-y-auto rounded-md border p-3 space-y-2">
-            {amenities.map((a) => {
-              const checked = form.amenityIds.includes(a.id)
-
-              return (
-                <label
-                  key={a.id}
-                  className="flex items-center gap-2 text-sm cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => {
-                      setForm((prev) => ({
-                        ...prev,
-                        amenityIds: checked
-                          ? prev.amenityIds.filter((id) => id !== a.id)
-                          : [...prev.amenityIds, a.id],
-                      }))
-                    }}
-                    className="h-4 w-4 rounded border-gray-300"
-                  />
-
-                  <span>{a.name}</span>
-                </label>
-              )
-            })}
-          </div>
-
-          {form.amenityIds.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              Selecciona una o varias amenidades.
-            </p>
-          )}
-        </div>
-
-
-      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label className="text-foreground">Estado</Label>
           <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as RoomStatus })}>
@@ -273,11 +259,43 @@ function RoomForm({
             </SelectContent>
           </Select>
         </div>
+      </div>
 
-        <div className="flex items-center gap-2 pt-7">
-          <Switch checked={form.isBusy} onCheckedChange={(v) => setForm({ ...form, isBusy: v })} />
-          <Label className="text-foreground">Ocupada (isBusy)</Label>
+      <div className="space-y-2">
+        <Label className="text-foreground">Amenidades</Label>
+
+        <div className="max-h-40 overflow-y-auto rounded-md border p-3 space-y-2">
+          {amenities.map((a) => {
+            const checked = form.amenityIds.includes(a.id)
+            return (
+              <label key={a.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => {
+                    setForm((prev) => ({
+                      ...prev,
+                      amenityIds: checked
+                        ? prev.amenityIds.filter((id) => id !== a.id)
+                        : [...prev.amenityIds, a.id],
+                    }))
+                  }}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <span>{a.name}</span>
+              </label>
+            )
+          })}
         </div>
+
+        {form.amenityIds.length === 0 && (
+          <p className="text-xs text-muted-foreground">Selecciona una o varias amenidades.</p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 pt-1">
+        <Switch checked={form.isBusy} onCheckedChange={(v) => setForm({ ...form, isBusy: v })} />
+        <Label className="text-foreground">Ocupada (isBusy)</Label>
       </div>
 
       <div className="flex justify-end gap-2">
@@ -305,8 +323,6 @@ export default function AdminRoomsPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [changingId, setChangingId] = useState<string | null>(null)
-  const [amenitiesMap, setAmenitiesMap] = useState<Record<string, string>>({})
-
 
   const loadRooms = async () => {
     setLoading(true)
@@ -322,31 +338,10 @@ export default function AdminRoomsPage() {
   }
 
   useEffect(() => {
-    async function loadAll() {
-      if (!adminAuth.isAuthenticated) return
-  
-      setLoading(true)
-  
-      try {
-        const roomsData = await listRoomsService()
-        setRooms(roomsData)
-  
-        const amenitiesData = await listAmenitiesService()
-        const map = Object.fromEntries(
-          amenitiesData.map((a) => [a.id, a.name])
-        )
-        setAmenitiesMap(map)
-      } catch (e) {
-        setError("Error cargando datos")
-      } finally {
-        setLoading(false)
-      }
-    }
-  
-    loadAll()
+    if (!adminAuth.isAuthenticated) return
+    loadRooms()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminAuth.isAuthenticated])
-  
-  
 
   return (
     <div className="space-y-6">
@@ -387,6 +382,7 @@ export default function AdminRoomsPage() {
           <DialogHeader>
             <DialogTitle className="font-serif text-foreground">Editar habitación</DialogTitle>
           </DialogHeader>
+
           {editingRoom && (
             <RoomForm
               room={editingRoom}
@@ -405,7 +401,7 @@ export default function AdminRoomsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {rooms.map((room) => {
-          const img = roomImageByType(room.type)
+          const img = room.images?.[0] || roomImageByType(room.type)
           const isActive = room.status === "ACTIVE"
 
           return (
@@ -438,23 +434,24 @@ export default function AdminRoomsPage() {
 
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-serif font-semibold text-foreground">Hab. {room.nameRoom}</h3>
-                  <span className="text-lg font-bold text-accent">
+                  <div className="min-w-0">
+                    <h3 className="font-serif font-semibold text-foreground truncate">
+                      Hab. {room.nameRoom}
+                    </h3>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{room.description}</p>
+                  </div>
+
+                  <span className="text-lg font-bold text-accent whitespace-nowrap">
                     ${room.price}
                     <span className="text-xs text-muted-foreground">/noche</span>
                   </span>
                 </div>
 
-                <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                {/* Descripción */}
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {room.description}
-                </p>
+                <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1 flex-wrap">
                   <div className="flex items-center gap-1">
                     <Users className="h-4 w-4" />
                     <span>{room.capacity}</span>
                   </div>
-
 
                   <div className="flex items-center gap-1">
                     <BedSingle className="h-4 w-4" />
@@ -465,19 +462,32 @@ export default function AdminRoomsPage() {
                     <BedDouble className="h-4 w-4" />
                     <span>{room.doubleBeds}</span>
                   </div>
-                </div>
 
-                {room.amenityIds?.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {room.amenityIds.map((id) => (
-                    <Badge key={id} variant="outline" className="text-xs">
-                      {amenitiesMap[id] ?? "Desconocida"}
+                  <Badge variant="secondary" className="text-xs">
+                    {TYPE_LABEL[room.type] ?? room.type}
+                  </Badge>
+
+                  {(room.cabin ?? 0) > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      Cabaña: {room.cabin}
                     </Badge>
-                  ))}
+                  )}
+                  {(room.extraDouble ?? 0) > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      Doble extra: {room.extraDouble}
+                    </Badge>
+                  )}
                 </div>
-              )}
 
-
+                {room.amenities?.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {room.amenities.slice(0, 8).map((a) => (
+                      <Badge key={a.id} variant="outline" className="text-xs">
+                        {a.name}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
 
                 {canManageRooms && (
                   <div className="mt-3 flex flex-wrap justify-center gap-2">
@@ -485,7 +495,7 @@ export default function AdminRoomsPage() {
                       variant="outline"
                       size="sm"
                       onClick={async () => {
-                        const full = await getRoomService(room.id) 
+                        const full = await getRoomService(room.id)
                         setEditingRoom(full)
                       }}
                     >
@@ -493,7 +503,6 @@ export default function AdminRoomsPage() {
                       Editar
                     </Button>
 
-                    {/* Botón estado ACTIVE/INACTIVE */}
                     <Button
                       size="sm"
                       className={
@@ -513,7 +522,6 @@ export default function AdminRoomsPage() {
                       {changingId === room.id ? "Procesando..." : isActive ? "Inactivar" : "Activar"}
                     </Button>
 
-                    {/* Botón busy */}
                     <Button
                       size="sm"
                       variant="outline"

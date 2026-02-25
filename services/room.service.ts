@@ -1,54 +1,62 @@
-// services/room.service.ts
 import { apiFetch } from "@/lib/api"
 
-export type RoomType = "SIMPLE" | "DOUBLE" | "VIP"
+export type RoomType =
+  | "SIMPLE"
+  | "DOUBLE"
+  | "TRIPLE"
+  | "QUADRUPLE"
+  | "QUINTUPLE"
+  | "SEXTUPLE"
+  | "VIP"
+
 export type RoomStatus = "ACTIVE" | "INACTIVE"
 
-export type RoomAmenity = { id: string; name: string }
-
-// Esto es lo que realmente llega del backend
-export type BackendRoomFromApi = {
+export type BackendRoom = {
   id: string
   type: RoomType
   nameRoom: string
   description: string
   singleBeds: number
   doubleBeds: number
+  cabin: number
+  extraDouble: number
   capacity: number
   price: number
   status: RoomStatus
   isBusy: boolean
-  amenities: RoomAmenity[] 
+
+  // VIENE DEL BACKEND EN GET
+  amenities: { id: string; name: string }[] // (según tu ejemplo actual)
+  images: string[] // si son urls. si fueran ids, lo ajustamos luego
 }
 
-// Esto es lo que tu UI necesita para crear/editar (PUT/POST)
-export type BackendRoom = Omit<BackendRoomFromApi, "amenities"> & {
-  amenityIds: string[]        
-  amenities?: RoomAmenity[]   
-}
-
-export type RoomUpsertBody = Omit<BackendRoom, "id" | "amenities">
-
-function normalizeRoom(r: BackendRoomFromApi): BackendRoom {
-  return {
-    ...r,
-    amenityIds: (r.amenities ?? []).map((a) => a.id),
-    amenities: r.amenities ?? [],
-  }
+// Para crear/editar (REQUEST BODY)
+export type RoomUpsertBody = {
+  type: RoomType
+  nameRoom: string
+  description: string
+  singleBeds: number
+  doubleBeds: number
+  cabin: number
+  extraDouble: number
+  capacity: number
+  price: number
+  status: RoomStatus
+  isBusy: boolean
+  amenityIds: string[]
+  imagesIds: string[]
 }
 
 export async function listRoomsService() {
-  const data = await apiFetch<BackendRoomFromApi[]>("/api/room", { auth: true })
-  return data.map(normalizeRoom)
+  return apiFetch<BackendRoom[]>("/api/room", { auth: true })
 }
 
 export async function getRoomService(id: string) {
-  const data = await apiFetch<BackendRoomFromApi>(`/api/room/${id}`, { auth: true })
-  return normalizeRoom(data)
+  return apiFetch<BackendRoom>(`/api/room/${id}`, { auth: true })
 }
 
 export async function createRoomService(body: RoomUpsertBody) {
-  return apiFetch<BackendRoomFromApi>("/api/room", {
+  return apiFetch<BackendRoom>("/api/room", {
     method: "POST",
     auth: true,
     body: JSON.stringify(body),
@@ -56,7 +64,7 @@ export async function createRoomService(body: RoomUpsertBody) {
 }
 
 export async function updateRoomService(id: string, body: RoomUpsertBody) {
-  return apiFetch<BackendRoomFromApi>(`/api/room/${id}`, {
+  return apiFetch<BackendRoom>(`/api/room/${id}`, {
     method: "PUT",
     auth: true,
     body: JSON.stringify(body),
