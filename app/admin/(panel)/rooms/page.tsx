@@ -27,6 +27,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from "@/components/ui/switch"
 
 import { Plus, Pencil, Users, BedDouble, BedSingle } from "lucide-react"
+import { uploadMediaService } from "@/services/media.service"
 
 const TYPE_LABEL: Record<RoomType, string> = {
   SIMPLE: "Sencilla",
@@ -55,6 +56,7 @@ function RoomForm({
   onClose: () => void
 }) {
   const [amenities, setAmenities] = useState<BackendAmenity[]>([])
+  const [files, setFiles] = useState<File[]>([])
 
   const [form, setForm] = useState<RoomUpsertBody>(
     room
@@ -131,6 +133,13 @@ function RoomForm({
     setSaving(true)
     setError(null)
     try {
+      let imagesIds: string[] = []
+    if (files.length > 0) {
+      const upload = await uploadMediaService(files)
+      imagesIds = upload.ids
+    }
+    await onSave({ ...form, imagesIds })
+    
       await onSave(form)
       onClose()
     } catch (e: any) {
@@ -288,9 +297,24 @@ function RoomForm({
           })}
         </div>
 
+
+
         {form.amenityIds.length === 0 && (
           <p className="text-xs text-muted-foreground">Selecciona una o varias amenidades.</p>
         )}
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-foreground">Imágenes</Label>
+        <Input
+          type="file"
+          multiple
+          accept="image/*"
+          onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+        />
+        <p className="text-xs text-muted-foreground">
+          {files.length > 0 ? `${files.length} archivo(s) seleccionado(s)` : "Selecciona una o más imágenes."}
+        </p>
       </div>
 
       <div className="flex items-center gap-2 pt-1">

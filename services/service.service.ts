@@ -12,21 +12,25 @@ export type BackendService = {
   price: number
   status: ServiceStatus
   billingType: ServiceBillingType
+
+  // GET
+  images: string[]
 }
 
-export type CreateServiceBody = {
+export type ServiceUpsertBody = {
   name: string
   description: string
   decription?: string
   price: number
   billingType: ServiceBillingType
+  imagesIds: string[]
 }
 
 export async function listServicesService() {
   return apiFetch<BackendService[]>("/api/service", { auth: true })
 }
 
-export async function createServiceService(body: CreateServiceBody) {
+export async function createServiceService(body: ServiceUpsertBody) {
   return apiFetch<BackendService>("/api/service", {
     method: "POST",
     auth: true,
@@ -34,7 +38,7 @@ export async function createServiceService(body: CreateServiceBody) {
   })
 }
 
-export async function updateServiceService(id: string, body: CreateServiceBody) {
+export async function updateServiceService(id: string, body: ServiceUpsertBody) {
   return apiFetch<BackendService>(`/api/service/${id}`, {
     method: "PUT",
     auth: true,
@@ -48,4 +52,8 @@ export async function updateServiceStatusService(id: string, status: ServiceStat
     auth: true,
     body: JSON.stringify({ status }),
   })
+}
+
+export async function getServiceService(id: string) {
+  return apiFetch<BackendService>(`/api/service/${id}`, { auth: true })
 }

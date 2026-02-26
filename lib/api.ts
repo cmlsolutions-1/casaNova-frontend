@@ -11,9 +11,18 @@ type ApiResponse<T> = {
   meta?: any
 }
 
-function buildHeaders(initHeaders?: HeadersInit, extra?: Record<string, string>) {
+function buildHeaders(
+  initHeaders?: HeadersInit,
+  extra?: Record<string, string>,
+  opts?: { isFormData?: boolean },
+) {
   const h = new Headers(initHeaders)
-  h.set("Content-Type", "application/json")
+
+  // SOLO setear JSON si NO es FormData
+  if (!opts?.isFormData && !h.has("Content-Type")) {
+    h.set("Content-Type", "application/json")
+  }
+
   if (extra) for (const [k, v] of Object.entries(extra)) h.set(k, v)
   return h
 }
@@ -43,10 +52,13 @@ export async function apiFetch<T>(
   const authHeaders =
     init.auth && access ? { Authorization: `Bearer ${access}` } : undefined
 
+  const isFormData =
+    typeof FormData !== "undefined" && init.body instanceof FormData
+
   // 1er intento
   const res = await fetch(url, {
     ...init,
-    headers: buildHeaders(init.headers, authHeaders),
+    headers: buildHeaders(init.headers, authHeaders, { isFormData }),
   })
 
   const json = (await safeJson(res)) as any
@@ -60,7 +72,7 @@ export async function apiFetch<T>(
 
     const refreshRes = await fetch(`${API_BASE}/api/auth/refresh`, {
       method: "POST",
-      headers: buildHeaders(),
+      headers: buildHeaders(undefined, undefined, { isFormData: false }),
       body: JSON.stringify({ refreshToken }),
     })
 
@@ -74,14 +86,20 @@ export async function apiFetch<T>(
       throw new Error(refreshJson?.message || "Sesión expirada")
     }
 
-    authStorage.setTokens(refreshJson.data.accesToken, refreshJson.data.refreshToken)
+    authStorage.setTokens(
+      refreshJson.data.accesToken,
+      refreshJson.data.refreshToken,
+    )
 
     // reintento
+    const retryIsFormData =
+      typeof FormData !== "undefined" && init.body instanceof FormData
+
     const retryRes = await fetch(url, {
       ...init,
       headers: buildHeaders(init.headers, {
         Authorization: `Bearer ${refreshJson.data.accesToken}`,
-      }),
+      }, { isFormData: retryIsFormData }),
     })
 
     const retryJson = (await safeJson(retryRes)) as any
@@ -91,9 +109,10 @@ export async function apiFetch<T>(
     throw new Error(retryJson?.message || `Error ${retryRes.status} en ${url}`)
   }
 
-  // mensaje de error claro
   if (json?.__nonJson) {
-    throw new Error(`Respuesta no JSON (${res.status}) en ${url}: ${json.text?.slice(0, 200)}`)
+    throw new Error(
+      `Respuesta no JSON (${res.status}) en ${url}: ${json.text?.slice(0, 200)}`,
+    )
   }
 
   throw new Error(json?.message || `Error ${res.status} en ${url}`)

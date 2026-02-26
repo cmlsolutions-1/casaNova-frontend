@@ -1,5 +1,3 @@
-//app/admin/(panel)/services/page.tsx
-
 "use client"
 
 import React, { useEffect, useState } from "react"
@@ -10,32 +8,49 @@ import {
   createServiceService,
   updateServiceService,
   updateServiceStatusService,
+  getServiceService,
   type BackendService,
-  type ServiceStatus,
+  type ServiceBillingType,
+  type ServiceUpsertBody,
 } from "@/services/service.service"
+
+import { uploadMediaService } from "@/services/media.service"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import type { ServiceBillingType } from "@/services/service.service"
+import { Plus, Pencil, X } from "lucide-react"
 
+type ImageFile = {
+  id: string
+  file: File
+  preview: string
+}
 
-import { Plus, Pencil } from "lucide-react"
-
-function serviceImageByName(name: string) {
-  if (name.toLowerCase().includes("spa"))
-    return "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&h=600&fit=crop"
-
-  if (name.toLowerCase().includes("jacuzzi"))
-    return "https://images.unsplash.com/photo-1582582621959-48d27397dc7c?w=800&h=600&fit=crop"
-
-  return "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&h=600&fit=crop"
+function normalizeService(s: any): BackendService {
+  return {
+    ...s,
+    description: s.description ?? s.decription ?? "",
+    images: s.images ?? [],
+  }
 }
 
 function ServiceForm({
@@ -44,25 +59,29 @@ function ServiceForm({
   onClose,
 }: {
   service?: BackendService
-  onSave: (data: { name: string; description: string; price: number; billingType: ServiceBillingType }) => Promise<void>
+  onSave: (data: ServiceUpsertBody) => Promise<void>
   onClose: () => void
 }) {
   const [name, setName] = useState(service?.name ?? "")
   const [description, setDescription] = useState(service?.description ?? "")
   const [price, setPrice] = useState(service?.price ?? 50)
+  const [billingType, setBillingType] =
+    useState<ServiceBillingType>(service?.billingType ?? "FIXED")
 
+  const [images, setImages] = useState<ImageFile[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [billingType, setBillingType] = useState<ServiceBillingType>(service?.billingType ?? "FIXED")
+
+  const existingImages = service?.images ?? []
 
   useEffect(() => {
     if (!service) return
     setName(service.name)
-    setDescription(service.description)
+    setDescription(service.description ?? "")
     setPrice(service.price)
     setBillingType(service.billingType)
+    setImages([])
   }, [service])
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,7 +89,24 @@ function ServiceForm({
     setError(null)
 
     try {
-      await onSave({ name, description, price, billingType })
+      let imagesIds: string[] = []
+
+      if (images.length > 0) {
+        const upload = await uploadMediaService(
+          images.map((img) => img.file)
+        )
+        imagesIds = upload.ids
+      }
+      console.log("BODY A ENVIAR:", { name, description, price, billingType, imagesIds })
+
+      await onSave({
+        name,
+        description,
+        price,
+        billingType,
+        imagesIds,
+      })
+
       onClose()
     } catch (e: any) {
       setError(e?.message ?? "Error guardando servicio")
@@ -90,14 +126,24 @@ function ServiceForm({
 
       <div className="space-y-2">
         <Label>Descripción</Label>
-        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} required />
+        <Textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          required
+        />
       </div>
 
       <div className="space-y-2">
         <Label>Tipo de cobro</Label>
-        <Select value={billingType} onValueChange={(v) => setBillingType(v as ServiceBillingType)}>
+        <Select
+          value={billingType}
+          onValueChange={(v) =>
+            setBillingType(v as ServiceBillingType)
+          }
+        >
           <SelectTrigger>
-            <SelectValue placeholder="Selecciona..." />
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="FIXED">Fijo</SelectItem>
@@ -105,7 +151,6 @@ function ServiceForm({
           </SelectContent>
         </Select>
       </div>
-
 
       <div className="space-y-2">
         <Label>Precio ($)</Label>
@@ -118,12 +163,90 @@ function ServiceForm({
         />
       </div>
 
+      {/* Upload */}
+      <div className="space-y-2">
+        <Label>Imágenes</Label>
+        <Input
+          type="file"
+          multiple
+          accept="image/*"
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? [])
+            const newImages = files
+              .filter((file) => file.type.startsWith("image/"))
+              .map((file) => ({
+                id: crypto.randomUUID(),
+                file,
+                preview: URL.createObjectURL(file),
+              }))
+            setImages((prev) => [...prev, ...newImages])
+          }}
+        />
+      </div>
+
+      {/* Preview nuevas */}
+      {images.length > 0 && (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {images.map((img) => (
+            <div
+              key={img.id}
+              className="relative aspect-square overflow-hidden rounded-lg border"
+            >
+              <img
+                src={img.preview}
+                alt="preview"
+                className="h-full w-full object-cover"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  setImages((prev) =>
+                    prev.filter((i) => i.id !== img.id)
+                  )
+                }
+                className="absolute right-2 top-2 rounded-full bg-red-600 p-1 text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+
+      {/* Preview existentes */}
+        {existingImages.length > 0 && images.length === 0 && (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {existingImages.map((img, i) => (
+              <div
+                key={i}
+                className="aspect-square overflow-hidden rounded-lg border"
+              >
+                <img
+                  src={img}
+                  alt="Servicio"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
       <div className="flex justify-end gap-2">
-        <Button variant="outline" type="button" onClick={onClose}>
+        <Button
+          variant="outline"
+          type="button"
+          onClick={onClose}
+          disabled={saving}
+        >
           Cancelar
         </Button>
         <Button type="submit" disabled={saving}>
-          {saving ? "Guardando..." : service ? "Guardar cambios" : "Crear servicio"}
+          {saving
+            ? "Guardando..."
+            : service
+            ? "Guardar cambios"
+            : "Crear servicio"}
         </Button>
       </div>
     </form>
@@ -133,32 +256,21 @@ function ServiceForm({
 export default function AdminServicesPage() {
   const { adminAuth } = useBooking()
   const role = adminAuth.user?.role
-
   const canManage = role === "SUPER_ADMIN" || role === "ADMIN"
 
   const [services, setServices] = useState<BackendService[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
   const [creating, setCreating] = useState(false)
-  const [editingService, setEditingService] = useState<BackendService | null>(null)
-
-  const [changingId, setChangingId] = useState<string | null>(null)
+  const [editingService, setEditingService] =
+    useState<BackendService | null>(null)
+  const [changingId, setChangingId] =
+    useState<string | null>(null)
 
   const loadServices = async () => {
     setLoading(true)
-    setError(null)
-
     try {
       const data = await listServicesService()
-      const normalized = data.map((s: any) => ({
-        ...s,
-        // SIEMPRE garantiza description
-        description: s.description ?? s.decription ?? "",
-      }))
-      setServices(normalized)
-    } catch (e: any) {
-      setError(e?.message ?? "Error cargando servicios")
+      setServices(data.map(normalizeService))
     } finally {
       setLoading(false)
     }
@@ -171,12 +283,8 @@ export default function AdminServicesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-serif text-3xl font-bold">Servicios</h1>
-          <p className="text-muted-foreground">Gestiona los servicios adicionales del hotel</p>
-        </div>
+        <h1 className="text-3xl font-bold">Servicios</h1>
 
         {canManage && (
           <Dialog open={creating} onOpenChange={setCreating}>
@@ -186,12 +294,10 @@ export default function AdminServicesPage() {
                 Nuevo servicio
               </Button>
             </DialogTrigger>
-
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Crear servicio</DialogTitle>
               </DialogHeader>
-
               <ServiceForm
                 onSave={async (body) => {
                   await createServiceService(body)
@@ -204,22 +310,27 @@ export default function AdminServicesPage() {
         )}
       </div>
 
-      {/* States */}
       {loading && <p>Cargando...</p>}
-      {error && <p className="text-red-500">{error}</p>}
 
-      {/* Grid */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {services.map((svc) => {
-          const img = serviceImageByName(svc.name)
+          const img = svc.images?.[0]
           const isActive = svc.status === "ACTIVE"
 
           return (
-            <Card key={svc.id} className="overflow-hidden border-border">
-              {/* Image */}
-              <div className="relative h-36">
-                <img src={img} alt={svc.name} className="h-full w-full object-cover" />
-
+            <Card key={svc.id}>
+              <div className="relative h-36 bg-muted">
+                {img ? (
+                  <img
+                    src={img}
+                    alt={svc.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    Sin imagen
+                  </div>
+                )}
                 <Badge
                   className={`absolute top-2 right-2 ${
                     isActive
@@ -229,83 +340,86 @@ export default function AdminServicesPage() {
                 >
                   {isActive ? "Activo" : "Inactivo"}
                 </Badge>
+
               </div>
 
-              {/* Content */}
               <CardContent className="p-4 space-y-2">
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="text-xs">
-                  {svc.billingType === "HOURLY" ? "Por hora" : "Fijo"}
-                </Badge>
-              </div>
-
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between">
                   <h3 className="font-semibold">{svc.name}</h3>
-                  <span className="font-bold text-accent">${svc.price}</span>
+                  <span className="font-bold">
+                    ${svc.price}
+                  </span>
                 </div>
 
-                <p className="text-xs text-muted-foreground line-clamp-2">{svc.decription}</p>
+                <p className="text-sm text-muted-foreground">
+                  {svc.description}
+                </p>
 
-                {/* Actions */}
                 {canManage && (
-                  <div className="mt-3 flex justify-center gap-2 flex-wrap">
-                    {/* Edit */}
-                    <Button size="sm" variant="outline" onClick={() => setEditingService(svc)}>
-                      <Pencil className="mr-2 h-3 w-3" />
-                      Editar
-                    </Button>
-
-                    {/* Toggle status */}
-                    <Button
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      const full =
+                        await getServiceService(svc.id)
+                      setEditingService(
+                        normalizeService(full)
+                      )
+                    }}
+                  >
+                    <Pencil className="mr-2 h-3 w-3" />
+                    Editar
+                  </Button>
+                  
+                )}
+                {/* Toggle status */}
+                <Button
                       size="sm"
                       className={
-                        isActive
-                          ? "bg-red-600 text-white hover:bg-red-700"
-                          : "bg-green-600 text-white hover:bg-green-700"
+                        isActive ? "bg-red-600 text-white hover:bg-red-700" : "bg-green-600 text-white hover:bg-green-700"
                       }
                       disabled={changingId === svc.id}
                       onClick={async () => {
                         setChangingId(svc.id)
                         try {
-                          await updateServiceStatusService(
-                            svc.id,
-                            isActive ? "INACTIVE" : "ACTIVE",
-                          )
+                          await updateServiceStatusService(svc.id, isActive ? "INACTIVE" : "ACTIVE")
                           await loadServices()
                         } finally {
                           setChangingId(null)
                         }
                       }}
                     >
-                      {changingId === svc.id
-                        ? "Procesando..."
-                        : isActive
-                        ? "Inactivar"
-                        : "Activar"}
+                      {changingId === svc.id ? "Procesando..." : isActive ? "Inactivar" : "Activar"}
                     </Button>
-                  </div>
-                )}
               </CardContent>
             </Card>
           )
         })}
       </div>
 
-      {/* Edit Dialog global */}
-      <Dialog open={!!editingService} onOpenChange={(open) => !open && setEditingService(null)}>
+      <Dialog
+        open={!!editingService}
+        onOpenChange={(open) =>
+          !open && setEditingService(null)
+        }
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar servicio</DialogTitle>
           </DialogHeader>
-
           {editingService && (
             <ServiceForm
               service={editingService}
               onSave={async (body) => {
-                await updateServiceService(editingService.id, body)
+                await updateServiceService(
+                  editingService.id,
+                  body
+                )
                 await loadServices()
               }}
-              onClose={() => setEditingService(null)}
+              onClose={() =>
+                setEditingService(null)
+              }
             />
           )}
         </DialogContent>
