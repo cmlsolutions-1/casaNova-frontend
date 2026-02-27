@@ -292,13 +292,22 @@ function ServiceForm({
         {(service?.images?.length ?? 0) > 0 && images.length === 0 && (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">Imágenes actuales</p>
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {(service?.images ?? []).map((url, i) => (
-                <div key={`${url}-${i}`} className="aspect-square overflow-hidden rounded-lg border bg-muted">
-                  <img src={url} alt="Servicio" className="h-full w-full object-cover" />
+              {(service?.images ?? []).map((img) => (
+                <div
+                  key={img.id}
+                  className="aspect-square overflow-hidden rounded-lg border bg-muted"
+                >
+                  <img
+                    src={img.url}
+                    alt="Servicio"
+                    className="h-full w-full object-cover"
+                  />
                 </div>
               ))}
             </div>
+
             <p className="text-xs text-muted-foreground">
               Si quieres cambiarlas, selecciona nuevas y vuelve a subir.
             </p>
@@ -399,7 +408,7 @@ export default function AdminServicesPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {services.map((svc) => {
           const isActive = svc.status === "ACTIVE"
-          const img = svc.images?.[0]
+          const img = svc.images?.[0]?.url
 
           return (
             <Card key={svc.id} className="overflow-hidden border-border">

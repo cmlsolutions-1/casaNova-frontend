@@ -4,6 +4,8 @@ import { apiFetch } from "@/lib/api"
 export type ServiceStatus = "ACTIVE" | "INACTIVE"
 export type ServiceBillingType = "FIXED" | "HOURLY"
 
+export type BackendImage = { id: string; url: string }
+
 export type BackendService = {
   id: string
   name: string
@@ -12,9 +14,15 @@ export type BackendService = {
   price: number
   status: ServiceStatus
   billingType: ServiceBillingType
+  images: BackendImage[]
+}
 
-  // GET
-  images: string[]
+function normalizeService(s: any): BackendService {
+  return {
+    ...s,
+    description: s.description ?? s.decription ?? "",
+    images: Array.isArray(s.images) ? s.images : [],
+  }
 }
 
 export type ServiceUpsertBody = {
