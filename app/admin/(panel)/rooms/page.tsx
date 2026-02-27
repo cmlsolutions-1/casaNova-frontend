@@ -25,8 +25,8 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
+import { Plus, Pencil, Users, BedDouble, BedSingle, Upload, X, Loader2 } from "lucide-react"
 
-import { Plus, Pencil, Users, BedDouble, BedSingle } from "lucide-react"
 import { uploadMediaService } from "@/services/media.service"
 
 const TYPE_LABEL: Record<RoomType, string> = {
@@ -40,7 +40,7 @@ const TYPE_LABEL: Record<RoomType, string> = {
 }
 
 function roomImageByType(type: RoomType) {
-  // 🔥 imágenes quemadas por ahora (fallback)
+  //imágenes quemadas por ahora (fallback)
   if (type === "VIP") return "https://images.unsplash.com/photo-1541971875076-8f970d573be6?w=800&h=600&fit=crop"
   if (type === "DOUBLE") return "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&h=600&fit=crop"
   return "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&h=600&fit=crop"
@@ -56,7 +56,15 @@ function RoomForm({
   onClose: () => void
 }) {
   const [amenities, setAmenities] = useState<BackendAmenity[]>([])
-  const [files, setFiles] = useState<File[]>([])
+
+  type LocalImage = { id: string; file: File; preview: string }
+
+  const [images, setImages] = useState<LocalImage[]>([])
+  const [uploadedImageIds, setUploadedImageIds] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
+
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   const [form, setForm] = useState<RoomUpsertBody>(
     room
@@ -73,7 +81,7 @@ function RoomForm({
           status: room.status,
           isBusy: room.isBusy,
           amenityIds: room.amenities?.map((a) => a.id) ?? [],
-          imagesIds: [], // ⚠️ por ahora: el GET devuelve images (urls) pero no ids
+          imagesIds: [], 
         }
       : {
           type: "SIMPLE",
@@ -128,26 +136,76 @@ function RoomForm({
     loadAmenities()
   }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      let imagesIds: string[] = []
-    if (files.length > 0) {
-      const upload = await uploadMediaService(files)
-      imagesIds = upload.ids
-    }
-    await onSave({ ...form, imagesIds })
-    
-      await onSave(form)
-      onClose()
-    } catch (e: any) {
-      setError(e?.message ?? "Error guardando habitación")
-    } finally {
-      setSaving(false)
-    }
+  const handlePickFiles = (filesList: FileList | null) => {
+  if (!filesList) return
+  const next: LocalImage[] = []
+
+  Array.from(filesList).forEach((file) => {
+    if (!file.type.startsWith("image/")) return
+    const id = Math.random().toString(36).slice(2)
+    const preview = URL.createObjectURL(file)
+    next.push({ id, file, preview })
+  })
+
+  if (next.length === 0) return
+
+  setUploadedImageIds([])
+  setImages((prev) => [...prev, ...next])
+}
+
+const removeLocalImage = (id: string) => {
+  setImages((prev) => {
+    const target = prev.find((x) => x.id === id)
+    if (target) URL.revokeObjectURL(target.preview)
+    return prev.filter((x) => x.id !== id)
+  })
+  setUploadedImageIds([])
+}
+
+const uploadSelectedImages = async () => {
+  setError(null)
+
+  if (images.length === 0) {
+    setError("Selecciona al menos una imagen para poder subirla.")
+    return
   }
+
+  setUploading(true)
+  try {
+    const upload = await uploadMediaService(images.map((x) => x.file))
+    if (!upload?.ids?.length) throw new Error("No se recibieron ids del backend al subir imágenes.")
+    setUploadedImageIds(upload.ids)
+  } catch (e: any) {
+    setError(e?.message ?? "Error subiendo imágenes")
+    setUploadedImageIds([])
+  } finally {
+    setUploading(false)
+  }
+}
+
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+  setSaving(true)
+  setError(null)
+
+  try {
+    // si quieres obligar imágenes al crear:
+    if (!room?.id && uploadedImageIds.length === 0) {
+      throw new Error("Debes subir las imágenes antes de crear la habitación.")
+    }
+
+    await onSave({
+      ...form,
+      imagesIds: uploadedImageIds,
+    })
+
+    onClose()
+  } catch (e: any) {
+    setError(e?.message ?? "Error guardando habitación")
+  } finally {
+    setSaving(false)
+  }
+}
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
@@ -306,16 +364,88 @@ function RoomForm({
 
       <div className="space-y-2">
         <Label className="text-foreground">Imágenes</Label>
-        <Input
+
+        <input
+          ref={fileInputRef}
           type="file"
           multiple
           accept="image/*"
-          onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+          className="hidden"
+          onChange={(e) => handlePickFiles(e.target.files)}
         />
-        <p className="text-xs text-muted-foreground">
-          {files.length > 0 ? `${files.length} archivo(s) seleccionado(s)` : "Selecciona una o más imágenes."}
-        </p>
+
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+            Seleccionar imágenes
+          </Button>
+
+          <Button
+            type="button"
+            onClick={uploadSelectedImages}
+            disabled={uploading || images.length === 0}
+            className="gap-2"
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            Subir imágenes
+          </Button>
+
+          <Badge variant="outline" className="text-xs">
+            {uploadedImageIds.length > 0 ? `Subidas: ${uploadedImageIds.length}` : "Aún no subidas"}
+          </Badge>
+        </div>
+
+        {images.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Seleccionadas ({images.length})</p>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {images.map((img) => (
+                <div key={img.id} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted">
+                  <img src={img.preview} alt={img.file.name} className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeLocalImage(img.id)}
+                    className="absolute right-2 top-2 rounded-full bg-destructive p-1.5 text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                    aria-label="Eliminar imagen"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                    <p className="truncate text-xs text-white">{img.file.name}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+          </div>
+        )}
       </div>
+        {/* Imágenes actuales (solo si editas y NO seleccionaste nuevas) */}
+        {(room?.images?.length ?? 0) > 0 && images.length === 0 && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Imágenes actuales</p>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {(room?.images ?? []).map((img) => (
+                <div
+                  key={img.id}
+                  className="aspect-square overflow-hidden rounded-lg border bg-muted"
+                >
+                  <img
+                    src={img.url}
+                    alt="Habitación"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Si quieres cambiarlas, selecciona nuevas y vuelve a subir.
+            </p>
+          </div>
+        )}
+
 
       <div className="flex items-center gap-2 pt-1">
         <Switch checked={form.isBusy} onCheckedChange={(v) => setForm({ ...form, isBusy: v })} />
@@ -425,7 +555,7 @@ export default function AdminRoomsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {rooms.map((room) => {
-          const img = room.images?.[0] || roomImageByType(room.type)
+          const img = room.images?.[0]?.url || roomImageByType(room.type)
           const isActive = room.status === "ACTIVE"
 
           return (

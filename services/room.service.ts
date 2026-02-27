@@ -1,3 +1,5 @@
+//services/room.service.ts
+
 import { apiFetch } from "@/lib/api"
 
 export type RoomType =
@@ -10,6 +12,7 @@ export type RoomType =
   | "VIP"
 
 export type RoomStatus = "ACTIVE" | "INACTIVE"
+export type BackendImage = { id: string; url: string }
 
 export type BackendRoom = {
   id: string
@@ -26,8 +29,8 @@ export type BackendRoom = {
   isBusy: boolean
 
   // VIENE DEL BACKEND EN GET
-  amenities: { id: string; name: string }[] // (según tu ejemplo actual)
-  images: string[] // si son urls. si fueran ids, lo ajustamos luego
+  amenities: { id: string; name: string }[] 
+  images: BackendImage[] 
 }
 
 // Para crear/editar (REQUEST BODY)
@@ -85,4 +88,14 @@ export async function updateRoomBusyService(id: string, isBusy: boolean) {
     auth: true,
     body: JSON.stringify({ isBusy }),
   })
+}
+
+//usado para el preview de habitaciones, en la pantalla inicial, no requiere auth porque es info publica
+export async function listRoomsPublicService() {
+  return apiFetch<BackendRoom[]>("/api/room") // sin auth
+}
+
+//usado para ver la habitacion, cuando se da ver detalles, no requiere auth porque es info publica
+export async function getRoomPublicService(id: string) {
+  return apiFetch<BackendRoom>(`/api/room/${id}`) // sin auth
 }

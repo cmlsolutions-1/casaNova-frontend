@@ -67,3 +67,8 @@ export async function updateServiceStatusService(id: string, status: ServiceStat
 export async function getServiceService(id: string) {
   return apiFetch<BackendService>(`/api/service/${id}`, { auth: true })
 }
+
+//para usar en el preview de los servicios, en la pantalla de booking, no requiere auth porque es info publica
+export async function listServicesPublicService() {
+  return apiFetch<BackendService[]>("/api/service") // sin auth
+}
