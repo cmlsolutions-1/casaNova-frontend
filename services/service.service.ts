@@ -31,6 +31,8 @@ export async function listServicesService() {
 }
 
 export async function createServiceService(body: ServiceUpsertBody) {
+  console.log("BODY QUE SE ENVÍA AL BACKEND:", body)
+  
   return apiFetch<BackendService>("/api/service", {
     method: "POST",
     auth: true,

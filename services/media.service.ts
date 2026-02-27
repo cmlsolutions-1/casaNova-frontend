@@ -1,3 +1,5 @@
+//services/media.service.ts
+
 import { authStorage } from "@/lib/auth-storage"
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
