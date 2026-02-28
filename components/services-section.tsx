@@ -1,10 +1,10 @@
-//components/services-section.tsx
+// components/services-section.tsx
 "use client"
 
-import React from "react"
-
+import React, { useEffect, useMemo, useState } from "react"
 import { Sparkles, Coffee, Car, Map, Clock, Wine } from "lucide-react"
-import { services } from "@/lib/mock-data"
+
+import { listServicesPublicService, type BackendService } from "@/services/service.service"
 
 const iconMap: Record<string, React.ElementType> = {
   Sparkles,
@@ -16,6 +16,37 @@ const iconMap: Record<string, React.ElementType> = {
 }
 
 export function ServicesSection() {
+  const [services, setServices] = useState<BackendService[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+
+    ;(async () => {
+      try {
+        const data = await listServicesPublicService()
+        if (!alive) return
+
+        // opcional: solo activos
+        const filtered = (data ?? []).filter((s) => s.status === "ACTIVE")
+        setServices(filtered)
+      } catch {
+        if (!alive) return
+        setServices([])
+      } finally {
+        if (alive) setLoading(false)
+      }
+    })()
+
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  // si quieres limitar a 6 por ejemplo (opcional)
+  const featured = useMemo(() => services.slice(0, 6), [services])
+
   return (
     <section id="services" className="py-20 px-4">
       <div className="mx-auto max-w-7xl">
@@ -32,9 +63,19 @@ export function ServicesSection() {
           </p>
         </div>
 
+        {loading && (
+          <p className="text-center text-muted-foreground">Cargando servicios...</p>
+        )}
+
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {services.map((service) => {
-            const Icon = iconMap[service.icon] || Sparkles
+          {featured.map((service) => {
+            // Si tu backend no trae icon, usamos uno por defecto.
+            // Si luego agregas `icon` al backend, aquí lo lees.
+            const Icon = Sparkles
+
+            // ✅ images = [{id,url}]
+            const img = (service as any)?.images?.[0]?.url || "/placeholder.svg"
+
             return (
               <div
                 key={service.id}
@@ -42,7 +83,7 @@ export function ServicesSection() {
               >
                 <div className="relative h-48 overflow-hidden">
                   <img
-                    src={service.images[0] || "/placeholder.svg"}
+                    src={img}
                     alt={service.name}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                   />
@@ -54,6 +95,7 @@ export function ServicesSection() {
                     <span className="text-lg font-bold text-white">${service.price} USD</span>
                   </div>
                 </div>
+
                 <div className="p-5">
                   <h3 className="text-lg font-bold text-card-foreground">{service.name}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -64,6 +106,10 @@ export function ServicesSection() {
             )
           })}
         </div>
+
+        {!loading && featured.length === 0 && (
+          <p className="text-center text-muted-foreground">No hay servicios disponibles.</p>
+        )}
       </div>
     </section>
   )

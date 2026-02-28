@@ -5,6 +5,7 @@ import { RoomsPreview } from "@/components/rooms-preview"
 import { ServicesSection } from "@/components/services-section"
 import { PublicFooter } from "@/components/public-footer"
 import { getHeroImages } from "@/lib/hero-images"
+import { LocationSection } from "@/components/location-section"
 
 export default function Page() {
   const images = getHeroImages()
@@ -16,6 +17,7 @@ export default function Page() {
       <SearchBar />
       <RoomsPreview />
       <ServicesSection />
+      <LocationSection />
       <PublicFooter />
     </main>
   )
