@@ -1,6 +1,7 @@
 // app/search/page.tsx
 "use client"
 
+import { useBooking } from "@/lib/booking-context"
 import { useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useMemo, useState } from "react"
 import { PublicHeader } from "@/components/public-header"
@@ -16,13 +17,14 @@ import { es } from "date-fns/locale"
 
 function SearchResults() {
   const searchParams = useSearchParams()
-
+  const { booking } = useBooking()
   const start = searchParams.get("start") || ""
   const end = searchParams.get("end") || ""
   const adults = Number(searchParams.get("adults")) || 1
   const kids = Number(searchParams.get("kids")) || 0
   const babies = Number(searchParams.get("babies")) || 0
   const pets = Number(searchParams.get("pets")) || 0
+  const remaining = Number(searchParams.get("remaining")) || 0
 
   const people = adults + kids + babies
 
@@ -39,6 +41,11 @@ function SearchResults() {
       return `${start} - ${end}`
     }
   }, [start, end])
+
+  const selectedIds = useMemo(() => {
+    const list = booking.selectedRooms ?? []
+    return new Set(list.map((r: any) => String(r?.id)))
+  }, [booking.selectedRooms])
 
   useEffect(() => {
     let alive = true
@@ -59,7 +66,11 @@ function SearchResults() {
         if (!alive) return
 
         // opcional: filtrar solo activas
-        const filtered = (data ?? []).filter((r) => r.status === "ACTIVE")
+        const filtered = (data ?? [])
+        .filter((r) => r.status === "ACTIVE")
+        .filter((r) => !selectedIds.has(String(r.id))) // ya seleccionadas NO aparecen
+
+      setRooms(filtered)
 
         setRooms(filtered)
       } catch (e: any) {
@@ -74,7 +85,7 @@ function SearchResults() {
     return () => {
       alive = false
     }
-  }, [start, end, people])
+  }, [start, end, people, selectedIds])
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
@@ -132,6 +143,17 @@ function SearchResults() {
               Nueva búsqueda
             </Button>
           </Link>
+        </div>
+      )}
+
+      {remaining > 0 && (
+        <div className="mb-6 rounded-2xl border border-accent/30 bg-accent/10 p-4">
+          <p className="font-semibold text-foreground">
+            Aún faltan {remaining} persona{remaining === 1 ? "" : "s"} por acomodar
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Selecciona otra habitación para completar tu reserva y continuar a servicios adicionales.
+          </p>
         </div>
       )}
 

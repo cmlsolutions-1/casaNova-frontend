@@ -79,38 +79,47 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
 
   const handleSelect = () => {
     if (!room) return
-  
+
     // guarda searchParams en booking (para no perderlos)
     if (start && end) {
       setSearchParams({ startDate: start, endDate: end, adults, kids, babies, pets })
     }
-  
-    // 1) agregas la habitación seleccionada
-    addSelectedRoom(room as any)
-  
-    // 2) calculas cuántas personas faltan por acomodar
-    const requiredPeople = adults + kids + babies
-    const prevCapacity = (booking.selectedRooms ?? []).reduce((sum, r: any) => sum + (r.capacity ?? 0), 0)
-    const nextCapacity = prevCapacity + (room.capacity ?? 0)
-  
+
+    // Calcula TODO como number (evita strings del storage)
+    const requiredPeople = Number(adults) + Number(kids) + Number(babies)
+
+    const prevCapacity = (booking.selectedRooms ?? []).reduce((sum, r: any) => {
+      return sum + Number(r?.capacity ?? 0)
+    }, 0)
+
+    const thisCapacity = Number(room?.capacity ?? 0)
+    const nextCapacity = prevCapacity + thisCapacity
+
     const remaining = Math.max(0, requiredPeople - nextCapacity)
-  
-    // 3) si faltan personas -> avisas y devuelves a resultados
+
+    // 1) agrega la habitación
+    addSelectedRoom(room as any)
+
+    // 2) si faltan personas -> mensaje + volver a resultados
     if (remaining > 0) {
       toast.info("Aún faltan personas por acomodar", {
-        description: `Te faltan ${remaining} persona${remaining === 1 ? "" : "s"} por acomodar. Selecciona otra habitación para completar tu reserva.`,
-        duration: 5000,
+        description: `Seleccionaste una habitación para ${thisCapacity} persona${thisCapacity === 1 ? "" : "s"}. Te faltan ${remaining} por acomodar. Elige otra habitación para completar tu reserva.`,
+        duration: 6000,
       })
-  
+
       router.push(
-        `/search?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}`,
+        `/search?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}&remaining=${remaining}`,
       )
       return
     }
-  
-    // 4) si ya se completó -> pasa a servicios adicionales
-    router.push("/booking/services")
-  }
+
+  // 3) si ya completó capacidad -> servicios
+  toast.success("¡Perfecto!", {
+    description: "Ya acomodaste a todos los huéspedes. Ahora puedes agregar servicios adicionales.",
+    duration: 4000,
+  })
+  router.push("/booking/services")
+}
 
   if (loadingRoom) {
     return (

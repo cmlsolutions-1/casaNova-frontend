@@ -38,7 +38,7 @@ export default function AdminDashboard() {
   const pendingCount = reservations.filter((r) => r.status === "PAID_PENDING_APPROVAL").length
   const approvedCount = reservations.filter((r) => r.status === "APPROVED").length
 
-  // 👇 Ajusta esto a TU backend real de rooms
+  // Ajusta esto a TU backend real de rooms
   // Si tu backend usa "ACTIVE/INACTIVE" no "available", cámbialo:
   const availableRooms = rooms.filter((r: any) => r.status === "ACTIVE").length
 
