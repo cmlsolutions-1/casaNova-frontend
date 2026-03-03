@@ -1,71 +1,60 @@
 "use client"
 
-import React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useBooking } from "@/lib/booking-context"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Sparkles, Coffee, Car, Map, Clock, Wine, Minus, Plus, ArrowRight } from "lucide-react"
+import { Sparkles, Minus, Plus, ArrowRight } from "lucide-react"
 import type { SelectedService } from "@/lib/mock-data"
-
-const iconMap: Record<string, React.ElementType> = {
-  Sparkles,
-  Coffee,
-  Car,
-  Map,
-  Clock,
-  Wine,
-}
+import { listServicesPublicService, type BackendService } from "@/services/service.service"
 
 export default function BookingServicesPage() {
   const router = useRouter()
-  const { services, booking, setSelectedServices } = useBooking()
+  const { booking, setSelectedServices } = useBooking()
+
+  const [services, setServices] = useState<BackendService[]>([])
+  const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Record<string, SelectedService>>({})
 
   useEffect(() => {
-    if (!booking.selectedRoom) {
+    // si no hay habitaciones seleccionadas, vuelve al inicio
+    if (!booking.selectedRooms || booking.selectedRooms.length === 0) {
       router.push("/")
       return
     }
-    if (booking.selectedServices.length > 0) {
-      const map: Record<string, SelectedService> = {}
-      for (const s of booking.selectedServices) {
-        map[s.serviceId] = s
+
+    // cargar servicios públicos del backend
+    ;(async () => {
+      try {
+        setLoading(true)
+        const data = await listServicesPublicService()
+        setServices(Array.isArray(data) ? data : [])
+      } finally {
+        setLoading(false)
       }
-      setSelected(map)
-    }
-  }, [booking.selectedRoom, booking.selectedServices, router])
+    })()
+  }, [booking.selectedRooms, router])
+
+  const activeServices = useMemo(
+    () => services.filter((s) => s.status === "ACTIVE"),
+    [services],
+  )
 
   const toggleService = (serviceId: string) => {
     setSelected((prev) => {
       const next = { ...prev }
-      if (next[serviceId]) {
-        delete next[serviceId]
-      } else {
-        next[serviceId] = { serviceId, amount: 1 }
-      }
+      if (next[serviceId]) delete next[serviceId]
+      else next[serviceId] = { serviceId, amount: 1 }
       return next
     })
   }
 
   const updateAmount = (serviceId: string, delta: number) => {
-    const svc = services.find((s) => s.id === serviceId)
-    if (!svc) return
     setSelected((prev) => {
       const current = prev[serviceId]
       if (!current) return prev
-      const newAmount = Math.max(1, Math.min(svc.maxAmount, current.amount + delta))
+      const newAmount = Math.max(1, current.amount + delta)
       return { ...prev, [serviceId]: { ...current, amount: newAmount } }
-    })
-  }
-
-  const updateSchedule = (serviceId: string, field: "startHour" | "endHour", value: string) => {
-    setSelected((prev) => {
-      const current = prev[serviceId]
-      if (!current) return prev
-      return { ...prev, [serviceId]: { ...current, [field]: value } }
     })
   }
 
@@ -88,12 +77,15 @@ export default function BookingServicesPage() {
         Seleccione los servicios que desea agregar a su estancia. Todos son opcionales.
       </p>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {services
-          .filter((s) => s.status === "active")
-          .map((service) => {
-            const Icon = iconMap[service.icon] || Sparkles
+      {loading ? (
+        <p className="text-muted-foreground">Cargando servicios...</p>
+      ) : activeServices.length === 0 ? (
+        <p className="text-muted-foreground">No hay servicios disponibles en este momento.</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {activeServices.map((service) => {
             const isSelected = !!selected[service.id]
+            const Icon = Sparkles // (backend no trae icono)
 
             return (
               <div
@@ -103,16 +95,22 @@ export default function BookingServicesPage() {
                 }`}
               >
                 <div className="flex items-start gap-4">
-                  <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${isSelected ? "bg-accent" : "bg-secondary"}`}>
+                  <div
+                    className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${
+                      isSelected ? "bg-accent" : "bg-secondary"
+                    }`}
+                  >
                     <Icon className={`h-6 w-6 ${isSelected ? "text-accent-foreground" : "text-muted-foreground"}`} />
                   </div>
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <h3 className="text-base font-bold text-card-foreground">{service.name}</h3>
                       <span className="font-bold text-foreground whitespace-nowrap">${service.price}</span>
                     </div>
+
                     <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-                      {service.description}
+                      {service.description ?? (service as any).decription ?? ""}
                     </p>
 
                     <div className="mt-3 flex items-center gap-3">
@@ -131,18 +129,14 @@ export default function BookingServicesPage() {
                             type="button"
                             onClick={() => updateAmount(service.id, -1)}
                             className="flex h-7 w-7 items-center justify-center rounded-full border text-foreground hover:bg-secondary"
-                            aria-label="Disminuir cantidad"
                           >
                             <Minus className="h-3 w-3" />
                           </button>
-                          <span className="text-sm font-bold w-4 text-center">
-                            {selected[service.id].amount}
-                          </span>
+                          <span className="text-sm font-bold w-4 text-center">{selected[service.id].amount}</span>
                           <button
                             type="button"
                             onClick={() => updateAmount(service.id, 1)}
                             className="flex h-7 w-7 items-center justify-center rounded-full border text-foreground hover:bg-secondary"
-                            aria-label="Aumentar cantidad"
                           >
                             <Plus className="h-3 w-3" />
                           </button>
@@ -150,34 +144,13 @@ export default function BookingServicesPage() {
                       )}
                     </div>
 
-                    {isSelected && service.hasSchedule && (
-                      <div className="mt-3 flex gap-3">
-                        <div>
-                          <label className="text-xs text-muted-foreground">Desde</label>
-                          <input
-                            type="time"
-                            value={selected[service.id]?.startHour || ""}
-                            onChange={(e) => updateSchedule(service.id, "startHour", e.target.value)}
-                            className="mt-0.5 block w-full rounded-lg border border-input bg-background px-2 py-1 text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">Hasta</label>
-                          <input
-                            type="time"
-                            value={selected[service.id]?.endHour || ""}
-                            onChange={(e) => updateSchedule(service.id, "endHour", e.target.value)}
-                            className="mt-0.5 block w-full rounded-lg border border-input bg-background px-2 py-1 text-sm"
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
             )
           })}
-      </div>
+        </div>
+      )}
 
       {total > 0 && (
         <div className="mt-6 rounded-xl bg-accent/10 p-4 text-center">

@@ -1,3 +1,5 @@
+//components/search-bar.tsx
+
 "use client"
 
 import { useState } from "react"
@@ -61,8 +63,15 @@ export function SearchBar() {
   const [babies, setBabies] = useState(0)
   const [pets, setPets] = useState(0)
 
+  const [openStart, setOpenStart] = useState(false)
+  const [openEnd, setOpenEnd] = useState(false)
+
   const handleSearch = () => {
     if (!startDate || !endDate) return
+  
+    // evita que salida sea igual o menor que llegada
+    if (endDate <= startDate) return
+  
     const params = {
       startDate: format(startDate, "yyyy-MM-dd"),
       endDate: format(endDate, "yyyy-MM-dd"),
@@ -71,7 +80,9 @@ export function SearchBar() {
       babies,
       pets,
     }
+  
     setSearchParams(params)
+  
     const query = new URLSearchParams({
       start: params.startDate,
       end: params.endDate,
@@ -80,6 +91,7 @@ export function SearchBar() {
       babies: String(babies),
       pets: String(pets),
     })
+  
     router.push(`/search?${query.toString()}`)
   }
 
@@ -107,13 +119,19 @@ export function SearchBar() {
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={startDate}
-                  onSelect={setStartDate}
-                  disabled={(date) => date < new Date()}
-                  initialFocus
-                />
+              <Calendar
+                locale={es}
+                mode="single"
+                selected={startDate}
+                onSelect={(date) => {
+                  setStartDate(date)
+                  if (date && endDate && endDate <= date) {
+                    setEndDate(undefined)
+                  }
+                }}
+                disabled={(date) => date < new Date()}
+                initialFocus
+              />
               </PopoverContent>
             </Popover>
           </div>
@@ -137,6 +155,7 @@ export function SearchBar() {
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
+                  locale={es}
                   mode="single"
                   selected={endDate}
                   onSelect={setEndDate}

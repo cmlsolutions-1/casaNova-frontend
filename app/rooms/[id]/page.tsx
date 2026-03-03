@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 
 import {
   ArrowLeft,
@@ -29,7 +30,7 @@ import { getRoomPublicService, type BackendRoom } from "@/services/room.service"
 function RoomDetailContent({ roomId }: { roomId: string }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { setSelectedRoom, booking, setSearchParams } = useBooking()
+  const { addSelectedRoom, booking, setSearchParams } = useBooking()
 
   const [room, setRoom] = useState<BackendRoom | null>(null)
   const [loadingRoom, setLoadingRoom] = useState(true)
@@ -78,10 +79,36 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
 
   const handleSelect = () => {
     if (!room) return
-    setSelectedRoom(room as any) // si tu SelectedRoom type es distinto, te lo ajusto luego
+  
+    // guarda searchParams en booking (para no perderlos)
     if (start && end) {
       setSearchParams({ startDate: start, endDate: end, adults, kids, babies, pets })
     }
+  
+    // 1) agregas la habitación seleccionada
+    addSelectedRoom(room as any)
+  
+    // 2) calculas cuántas personas faltan por acomodar
+    const requiredPeople = adults + kids + babies
+    const prevCapacity = (booking.selectedRooms ?? []).reduce((sum, r: any) => sum + (r.capacity ?? 0), 0)
+    const nextCapacity = prevCapacity + (room.capacity ?? 0)
+  
+    const remaining = Math.max(0, requiredPeople - nextCapacity)
+  
+    // 3) si faltan personas -> avisas y devuelves a resultados
+    if (remaining > 0) {
+      toast.info("Aún faltan personas por acomodar", {
+        description: `Te faltan ${remaining} persona${remaining === 1 ? "" : "s"} por acomodar. Selecciona otra habitación para completar tu reserva.`,
+        duration: 5000,
+      })
+  
+      router.push(
+        `/search?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}`,
+      )
+      return
+    }
+  
+    // 4) si ya se completó -> pasa a servicios adicionales
     router.push("/booking/services")
   }
 

@@ -1,6 +1,8 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 
 @layer utilities {
   .text-balance {
@@ -59,4 +61,65 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* --- DayPicker (react-day-picker) theme: Casa Nova --- */
+.rdp {
+  --rdp-cell-size: 38px;
+  --rdp-accent-color: hsl(var(--accent));
+  --rdp-background-color: hsl(var(--accent) / 0.18);
+  --rdp-outline: 2px solid hsl(var(--accent));
+  --rdp-outline-selected: 2px solid hsl(var(--accent));
+  margin: 0;
+}
+
+.rdp-months {
+  gap: 0;
+}
+
+.rdp-caption {
+  padding: 6px 8px;
+  font-weight: 600;
+}
+
+.rdp-caption_label {
+  text-transform: capitalize;
+}
+
+.rdp-nav_button {
+  border-radius: 10px;
+  border: 1px solid hsl(var(--border));
+  width: 32px;
+  height: 32px;
+}
+
+.rdp-nav_button:hover {
+  background: hsl(var(--secondary));
+}
+
+.rdp-head_cell {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  text-transform: lowercase;
+}
+
+.rdp-day {
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.rdp-day:hover {
+  background: hsl(var(--accent) / 0.14);
+}
+
+.rdp-day_today {
+  outline: 1px solid hsl(var(--accent));
+  outline-offset: -2px;
+}
+
+.rdp-day_selected,
+.rdp-day_selected:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
 }

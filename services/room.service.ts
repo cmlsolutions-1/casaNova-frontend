@@ -99,3 +99,18 @@ export async function listRoomsPublicService() {
 export async function getRoomPublicService(id: string) {
   return apiFetch<BackendRoom>(`/api/room/${id}`) // sin auth
 }
+
+export async function listAvailableRoomsPublicService(params: {
+  start: string
+  end: string
+  people: number
+}) {
+  const q = new URLSearchParams({
+    start: params.start,
+    end: params.end,
+    people: String(params.people),
+  })
+
+  return apiFetch<BackendRoom[]>(`/api/room/available?${q.toString()}`)
+}
+

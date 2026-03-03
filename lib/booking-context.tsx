@@ -8,12 +8,16 @@ import { rooms as defaultRooms, services as defaultServices, mockReservations, u
 import type { Service, User } from "./mock-data"
 
 import { loginService, logoutService } from "@/services/auth.service"
-import { listUsersService } from "@/services/user.service"
+
 import type { Role } from "@/lib/rbac"
 
 import { authStorage } from "@/lib/auth-storage"
 import { decodeJwt } from "@/lib/jwt"
 import { refreshService } from "@/services/auth.service"
+
+
+import type { BackendRoom } from "@/services/room.service"
+import type { BackendService } from "@/services/service.service"
 
 
 interface SearchParams {
@@ -27,7 +31,7 @@ interface SearchParams {
 
 interface BookingState {
   searchParams: SearchParams | null
-  selectedRoom: Room | null
+  selectedRooms: Room[]
   selectedServices: SelectedService[]
   guestInfo: GuestInfo | null
 }
@@ -41,13 +45,13 @@ interface BookingContextType {
   booking: BookingState
   adminAuth: AdminAuth
   hydrated: boolean
-  rooms: Room[]
-  services: Service[]
   reservations: Reservation[]
   payments: Payment[]
   users: User[]
   setSearchParams: (params: SearchParams) => void
-  setSelectedRoom: (room: Room) => void
+  addSelectedRoom: (room: Room) => void
+  removeSelectedRoom: (roomId: string) => void
+  clearSelectedRooms: () => void
   setSelectedServices: (services: SelectedService[]) => void
   setGuestInfo: (info: GuestInfo) => void
   createReservation: (payment: { method: "card" | "pse" | "cash" }) => string
@@ -99,16 +103,41 @@ function saveToStorage<T>(key: string, value: T): void {
   } catch {}
 }
 
+function normalizeBooking(raw: any): BookingState {
+  const base: BookingState = {
+    searchParams: null,
+    selectedRooms: [],
+    selectedServices: [],
+    guestInfo: null,
+  }
+
+  if (!raw || typeof raw !== "object") return base
+
+  // Migración: si existía selectedRoom (viejo), conviértelo a selectedRooms
+  const migratedSelectedRooms = Array.isArray(raw.selectedRooms)
+    ? raw.selectedRooms
+    : raw.selectedRoom
+      ? [raw.selectedRoom]
+      : []
+
+  return {
+    searchParams: raw.searchParams ?? null,
+    selectedRooms: migratedSelectedRooms,
+    selectedServices: Array.isArray(raw.selectedServices) ? raw.selectedServices : [],
+    guestInfo: raw.guestInfo ?? null,
+  }
+}
+
 const defaultBooking: BookingState = {
   searchParams: null,
-  selectedRoom: null,
+  selectedRooms: [],
   selectedServices: [],
   guestInfo: null,
 }
 
 export function BookingProvider({ children }: { children: React.ReactNode }) {
-  const [rooms, setRooms] = useState<Room[]>(defaultRooms)
-  const [services, setServices] = useState<Service[]>(defaultServices)
+  const [rooms, setRooms] = useState<BackendRoom[]>([])
+  const [services, setServices] = useState<BackendService[]>([])
   const [reservations, setReservations] = useState<Reservation[]>(mockReservations)
   const [payments, setPayments] = useState<Payment[]>([])
   const [users, setUsers] = useState<User[]>(defaultUsers)
@@ -169,7 +198,8 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     setReservations(loadFromStorage(STORAGE_KEYS.reservations, mockReservations))
     setPayments(loadFromStorage(STORAGE_KEYS.payments, []))
     setUsers(loadFromStorage(STORAGE_KEYS.users, defaultUsers))
-    setBooking(loadFromStorage(STORAGE_KEYS.booking, defaultBooking))
+    const stored = loadFromStorage(STORAGE_KEYS.booking, defaultBooking)
+    setBooking(normalizeBooking(stored))
     setHydrated(true)
   }, [])
 
@@ -212,8 +242,24 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     setBooking((prev) => ({ ...prev, searchParams: params }))
   }, [])
 
-  const setSelectedRoom = useCallback((room: Room) => {
-    setBooking((prev) => ({ ...prev, selectedRoom: room }))
+  const addSelectedRoom = useCallback((room: Room) => {
+    setBooking((prev) => {
+      const list = Array.isArray(prev.selectedRooms) ? prev.selectedRooms : []
+      const exists = list.some((r) => r.id === room.id)
+      if (exists) return prev
+      return { ...prev, selectedRooms: [...list, room] }
+    })
+  }, [])
+  
+  const removeSelectedRoom = useCallback((roomId: string) => {
+    setBooking((prev) => ({
+      ...prev,
+      selectedRooms: prev.selectedRooms.filter((r) => r.id !== roomId),
+    }))
+  }, [])
+
+  const clearSelectedRooms = useCallback(() => {
+    setBooking((prev) => ({ ...prev, selectedRooms: [] }))
   }, [])
 
   const setSelectedServices = useCallback((svc: SelectedService[]) => {
@@ -225,50 +271,66 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const createReservation = useCallback(
-    (payment: { method: "card" | "pse" | "cash" }): string => {
-      const resId = `res-${Date.now()}`
-      const payId = `pay-${Date.now()}`
-      const sp = booking.searchParams!
-      const svcTotal = booking.selectedServices.reduce((sum, s) => {
-        const svc = services.find((sv) => sv.id === s.serviceId)
-        return sum + (svc ? svc.price * s.amount : 0)
-      }, 0)
-      const start = new Date(sp.startDate)
-      const end = new Date(sp.endDate)
-      const nights = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
-      const total = booking.selectedRoom!.price * nights + svcTotal
+  (payment: { method: "card" | "pse" | "cash" }): string => {
+    const resId = `res-${Date.now()}`
+    const payId = `pay-${Date.now()}`
 
-      const newReservation: Reservation = {
-        id: resId,
-        roomId: booking.selectedRoom!.id,
-        guestInfo: booking.guestInfo!,
-        startDate: sp.startDate,
-        endDate: sp.endDate,
-        adults: sp.adults,
-        kids: sp.kids,
-        babies: sp.babies,
-        pets: sp.pets,
-        services: booking.selectedServices,
-        totalPrice: total,
-        status: "PAID_PENDING_APPROVAL",
-        createdAt: new Date().toISOString().split("T")[0],
-      }
+    const sp = booking.searchParams
+    if (!sp) throw new Error("Faltan searchParams para crear reserva")
+    if (!booking.guestInfo) throw new Error("Falta guestInfo para crear reserva")
+    if (!booking.selectedRooms || booking.selectedRooms.length === 0) {
+      throw new Error("Debes seleccionar al menos una habitación")
+    }
 
-      const newPayment: Payment = {
-        id: payId,
-        reservationId: resId,
-        amount: total,
-        method: payment.method,
-        status: "paid",
-        createdAt: new Date().toISOString().split("T")[0],
-      }
+    const svcTotal = booking.selectedServices.reduce((sum, s) => {
+      const svc = services.find((sv) => sv.id === s.serviceId)
+      return sum + (svc ? svc.price * s.amount : 0)
+    }, 0)
 
-      setReservations((prev) => [...prev, newReservation])
-      setPayments((prev) => [...prev, newPayment])
-      return resId
-    },
-    [booking, services],
-  )
+    const start = new Date(sp.startDate)
+    const end = new Date(sp.endDate)
+    const nights = Math.max(
+      1,
+      Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
+    )
+
+    // suma de precios por noche de TODAS las habitaciones seleccionadas
+    const roomsPerNightTotal = booking.selectedRooms.reduce((sum, r) => sum + (r.price ?? 0), 0)
+    const total = roomsPerNightTotal * nights + svcTotal
+
+    // ideal: guardar roomIds (varias habitaciones)
+    const newReservation: Reservation = {
+      id: resId,
+      // @ts-expect-error si tu tipo aún tiene roomId, cambia Reservation para usar roomIds
+      roomIds: booking.selectedRooms.map((r) => r.id),
+      guestInfo: booking.guestInfo,
+      startDate: sp.startDate,
+      endDate: sp.endDate,
+      adults: sp.adults,
+      kids: sp.kids,
+      babies: sp.babies,
+      pets: sp.pets,
+      services: booking.selectedServices,
+      totalPrice: total,
+      status: "PAID_PENDING_APPROVAL",
+      createdAt: new Date().toISOString().split("T")[0],
+    }
+
+    const newPayment: Payment = {
+      id: payId,
+      reservationId: resId,
+      amount: total,
+      method: payment.method,
+      status: "paid",
+      createdAt: new Date().toISOString().split("T")[0],
+    }
+
+    setReservations((prev) => [...prev, newReservation])
+    setPayments((prev) => [...prev, newPayment])
+    return resId
+  },
+  [booking, services],
+)
 
   const updateReservationStatus = useCallback((id: string, status: Reservation["status"]) => {
     setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)))
@@ -315,7 +377,9 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
         payments,
         users,
         setSearchParams,
-        setSelectedRoom,
+        addSelectedRoom,
+        removeSelectedRoom,
+        clearSelectedRooms,
         setSelectedServices,
         setGuestInfo,
         createReservation,
@@ -323,10 +387,6 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
         updateReservation,
         login,
         logout,
-        addRoom,
-        updateRoom,
-        addService,
-        updateService,
         addUser,
         resetBooking,
       }}
