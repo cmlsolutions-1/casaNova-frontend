@@ -115,9 +115,9 @@ export default function BookingPaymentPage() {
       const roomsPayload = selectedRooms.map((r: any, idx: number) => {
       const roomEntry: any = {
         roomId: r.id,
-        numberOfPeople: idx === 0 ? sp.adults : 0, // ✅ adultos
-        children: idx === 0 ? sp.kids : 0,         // ✅ niños
-        babys: idx === 0 ? sp.babies : 0,          // ✅ bebés
+        numberOfPeople: idx === 0 ? sp.adults : 0, 
+        children: idx === 0 ? sp.kids : 0,         
+        babys: idx === 0 ? sp.babies : 0,          
       }
 
       // pets: solo si > 0
