@@ -1,3 +1,4 @@
+//app/booking/services/page.tsx
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
@@ -10,20 +11,20 @@ import { listServicesPublicService, type BackendService } from "@/services/servi
 
 export default function BookingServicesPage() {
   const router = useRouter()
-  const { booking, setSelectedServices } = useBooking()
 
   const [services, setServices] = useState<BackendService[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Record<string, SelectedService>>({})
+  const { booking, setSelectedServices, hydrated } = useBooking()
 
   useEffect(() => {
-    // si no hay habitaciones seleccionadas, vuelve al inicio
+    if (!hydrated) return
+  
     if (!booking.selectedRooms || booking.selectedRooms.length === 0) {
       router.push("/")
       return
     }
-
-    // cargar servicios públicos del backend
+  
     ;(async () => {
       try {
         setLoading(true)
@@ -33,7 +34,7 @@ export default function BookingServicesPage() {
         setLoading(false)
       }
     })()
-  }, [booking.selectedRooms, router])
+  }, [hydrated, booking.selectedRooms, router])
 
   const activeServices = useMemo(
     () => services.filter((s) => s.status === "ACTIVE"),
@@ -60,7 +61,7 @@ export default function BookingServicesPage() {
 
   const handleContinue = () => {
     setSelectedServices(Object.values(selected))
-    router.push("/booking/guest")
+    setTimeout(() => router.push("/booking/guest"), 0)
   }
 
   const total = Object.values(selected).reduce((sum, s) => {

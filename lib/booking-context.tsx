@@ -39,7 +39,7 @@ interface BookingContextType {
   adminAuth: AdminAuth
   hydrated: boolean
 
-  // ✅ expón rooms/services para que lo usen admin y UI
+  // expón rooms/services para que lo usen admin y UI
   rooms: BackendRoom[]
   services: BackendService[]
 
@@ -124,7 +124,7 @@ const defaultBooking: BookingState = {
 }
 
 export function BookingProvider({ children }: { children: React.ReactNode }) {
-  // ✅ Ya NO mezclamos mock rooms/services con BackendRoom/BackendService
+  // Ya NO mezclamos mock rooms/services con BackendRoom/BackendService
   const [rooms] = useState<BackendRoom[]>([])
   const [services] = useState<BackendService[]>([])
 

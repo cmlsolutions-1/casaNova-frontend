@@ -1,48 +1,85 @@
+//app/booking/confirm/page.tsx
+
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useBooking } from "@/lib/booking-context"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import {
-  CalendarDays,
-  Users,
-  Bed,
-  ArrowRight,
-  Pencil,
-  Hotel,
-} from "lucide-react"
+import { CalendarDays, Users, ArrowRight, Pencil, Hotel } from "lucide-react"
+import { parseISO, format } from "date-fns"
+import { es } from "date-fns/locale"
+
+import { listServicesPublicService, type BackendService } from "@/services/service.service"
 
 export default function BookingConfirmPage() {
   const router = useRouter()
-  const { booking, services } = useBooking()
-  const { searchParams: sp, selectedRoom: room, selectedServices, guestInfo } = booking
+  const { booking } = useBooking()
+  const { searchParams: sp, selectedRooms, selectedServices, guestInfo } = booking
+
+  const [servicesFromApi, setServicesFromApi] = useState<BackendService[]>([])
+  const [loadingServices, setLoadingServices] = useState(true)
 
   useEffect(() => {
-    if (!room || !sp || !guestInfo) {
+    if (!sp || !guestInfo || !selectedRooms || selectedRooms.length === 0) {
       router.push("/")
+      return
     }
-  }, [room, sp, guestInfo, router])
 
-  if (!room || !sp || !guestInfo) return null
+    let alive = true
+    ;(async () => {
+      try {
+        setLoadingServices(true)
+        const data = await listServicesPublicService()
+        if (!alive) return
+        setServicesFromApi(Array.isArray(data) ? data : [])
+      } finally {
+        if (alive) setLoadingServices(false)
+      }
+    })()
 
-  const start = new Date(sp.startDate)
-  const end = new Date(sp.endDate)
-  const nights = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
-  const roomTotal = room.price * nights
+    return () => {
+      alive = false
+    }
+  }, [sp, guestInfo, selectedRooms, router])
 
-  const svcDetails = selectedServices.map((s) => {
-    const svc = services.find((sv) => sv.id === s.serviceId)
+  const nights = useMemo(() => {
+    if (!sp) return 0
+    const start = parseISO(sp.startDate)
+    const end = parseISO(sp.endDate)
+    return Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
+  }, [sp])
+
+  if (!sp || !guestInfo || !selectedRooms || selectedRooms.length === 0) return null
+
+  const prettyRange = (() => {
+    try {
+      return `${format(parseISO(sp.startDate), "dd MMM yyyy", { locale: es })} - ${format(parseISO(sp.endDate), "dd MMM yyyy", { locale: es })}`
+    } catch {
+      return `${sp.startDate} - ${sp.endDate}`
+    }
+  })()
+
+  const roomsPerNight = selectedRooms.reduce((sum: number, r: any) => sum + (r.price ?? 0), 0)
+  const roomsTotal = roomsPerNight * nights
+
+  const svcDetails = (selectedServices ?? []).map((s) => {
+    const svc = servicesFromApi.find((sv) => sv.id === s.serviceId)
     return {
-      name: svc?.name || "Servicio",
-      unitPrice: svc?.price || 0,
+      id: s.serviceId,
+      name: svc?.name ?? "Servicio",
+      unitPrice: svc?.price ?? 0,
       amount: s.amount,
-      total: (svc?.price || 0) * s.amount,
+      total: (svc?.price ?? 0) * s.amount,
     }
   })
+
   const svcTotal = svcDetails.reduce((sum, s) => sum + s.total, 0)
-  const grandTotal = roomTotal + svcTotal
+  const grandTotal = roomsTotal + svcTotal
+
+  const totalPeople = sp.adults + sp.kids + sp.babies
+  const capacityTotal = selectedRooms.reduce((sum: number, r: any) => sum + (r.capacity ?? 0), 0)
 
   return (
     <div>
@@ -54,67 +91,92 @@ export default function BookingConfirmPage() {
       </p>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main details */}
         <div className="lg:col-span-2 space-y-6">
           {/* Dates & guests */}
           <div className="rounded-2xl bg-card p-5 shadow">
             <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Fechas y Huespedes
+              Fechas y Huéspedes
             </h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex items-center gap-3">
                 <CalendarDays className="h-5 w-5 text-accent" />
                 <div>
                   <p className="text-xs text-muted-foreground">Estancia</p>
-                  <p className="text-sm font-bold">{sp.startDate} - {sp.endDate}</p>
-                  <p className="text-xs text-muted-foreground">{nights} noche{nights > 1 ? "s" : ""}</p>
+                  <p className="text-sm font-bold">{prettyRange}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {nights} noche{nights > 1 ? "s" : ""}
+                  </p>
                 </div>
               </div>
+
               <div className="flex items-center gap-3">
                 <Users className="h-5 w-5 text-accent" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Huespedes</p>
+                  <p className="text-xs text-muted-foreground">Huéspedes</p>
                   <p className="text-sm font-bold">
                     {sp.adults} adulto{sp.adults > 1 ? "s" : ""}
-                    {sp.kids > 0 ? `, ${sp.kids} nino${sp.kids > 1 ? "s" : ""}` : ""}
-                    {sp.babies > 0 ? `, ${sp.babies} bebe${sp.babies > 1 ? "s" : ""}` : ""}
+                    {sp.kids > 0 ? `, ${sp.kids} niño${sp.kids > 1 ? "s" : ""}` : ""}
+                    {sp.babies > 0 ? `, ${sp.babies} bebé${sp.babies > 1 ? "s" : ""}` : ""}
                     {sp.pets > 0 ? `, ${sp.pets} mascota${sp.pets > 1 ? "s" : ""}` : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Capacidad seleccionada: {capacityTotal} (para {totalPeople})
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Room */}
+          {/* Rooms */}
           <div className="rounded-2xl bg-card p-5 shadow">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Habitacion
+                Habitaciones
               </h2>
               <button
                 type="button"
-                onClick={() => router.push("/")}
+                onClick={() =>
+                  router.push(
+                    `/search?start=${sp.startDate}&end=${sp.endDate}&adults=${sp.adults}&kids=${sp.kids}&babies=${sp.babies}&pets=${sp.pets}`,
+                  )
+                }
                 className="flex items-center gap-1 text-xs text-accent hover:underline"
               >
                 <Pencil className="h-3 w-3" /> Cambiar
               </button>
             </div>
-            <div className="flex gap-4">
-              <img
-                src={room.images[0] || "/placeholder.svg"}
-                alt={room.name}
-                className="h-20 w-28 flex-shrink-0 rounded-xl object-cover"
-              />
-              <div>
-                <h3 className="font-bold text-card-foreground">{room.name}</h3>
-                <p className="text-sm text-muted-foreground capitalize">{room.type}</p>
-                <p className="mt-1 text-sm font-bold">${room.price} x {nights} noche{nights > 1 ? "s" : ""} = <span className="text-accent">${roomTotal}</span></p>
-              </div>
+
+            <div className="space-y-4">
+              {selectedRooms.map((room: any) => {
+                const img = room.images?.[0]?.url || room.images?.[0] || "/placeholder.svg"
+                const name = room.nameRoom ?? room.name ?? "Habitación"
+                const type = room.type ?? ""
+                return (
+                  <div key={room.id} className="flex gap-4">
+                    <img src={img} alt={name} className="h-20 w-28 flex-shrink-0 rounded-xl object-cover" />
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-card-foreground truncate">Hab. {name}</h3>
+                      <p className="text-sm text-muted-foreground capitalize">{type}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Capacidad: <span className="font-medium text-foreground">{room.capacity ?? "-"}</span>
+                      </p>
+                      <p className="mt-1 text-sm font-bold">
+                        ${room.price} <span className="text-muted-foreground font-normal">/ noche</span>
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
+
+            <p className="mt-4 text-sm font-bold">
+              Total habitaciones: ${roomsPerNight} x {nights} noche{nights > 1 ? "s" : ""} ={" "}
+              <span className="text-accent">${roomsTotal}</span>
+            </p>
           </div>
 
           {/* Services */}
-          {svcDetails.length > 0 && (
+          {(selectedServices?.length ?? 0) > 0 && (
             <div className="rounded-2xl bg-card p-5 shadow">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
@@ -128,14 +190,21 @@ export default function BookingConfirmPage() {
                   <Pencil className="h-3 w-3" /> Editar
                 </button>
               </div>
-              <div className="space-y-2">
-                {svcDetails.map((s) => (
-                  <div key={s.name} className="flex items-center justify-between text-sm">
-                    <span className="text-card-foreground">{s.name} x{s.amount}</span>
-                    <span className="font-bold">${s.total}</span>
-                  </div>
-                ))}
-              </div>
+
+              {loadingServices ? (
+                <p className="text-sm text-muted-foreground">Cargando servicios...</p>
+              ) : (
+                <div className="space-y-2">
+                  {svcDetails.map((s) => (
+                    <div key={s.id} className="flex items-center justify-between text-sm">
+                      <span className="text-card-foreground">
+                        {s.name} x{s.amount}
+                      </span>
+                      <span className="font-bold">${s.total}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -143,7 +212,7 @@ export default function BookingConfirmPage() {
           <div className="rounded-2xl bg-card p-5 shadow">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Datos del Huesped
+                Datos del Huésped
               </h2>
               <button
                 type="button"
@@ -153,11 +222,26 @@ export default function BookingConfirmPage() {
                 <Pencil className="h-3 w-3" /> Editar
               </button>
             </div>
+
             <div className="grid gap-2 text-sm sm:grid-cols-2">
-              <div><span className="text-muted-foreground">Nombre:</span> <span className="font-medium">{guestInfo.name}</span></div>
-              <div><span className="text-muted-foreground">Email:</span> <span className="font-medium">{guestInfo.email}</span></div>
-              <div><span className="text-muted-foreground">Telefono:</span> <span className="font-medium">{guestInfo.phone}</span></div>
-              <div><span className="text-muted-foreground">Documento:</span> <span className="font-medium">{guestInfo.documentType} {guestInfo.documentNumber}</span></div>
+              <div>
+                <span className="text-muted-foreground">Nombre:</span>{" "}
+                <span className="font-medium">{guestInfo.name}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Email:</span>{" "}
+                <span className="font-medium">{guestInfo.email}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Teléfono:</span>{" "}
+                <span className="font-medium">{guestInfo.phone}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Documento:</span>{" "}
+                <span className="font-medium">
+                  {guestInfo.documentType} {guestInfo.documentNumber}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -169,23 +253,30 @@ export default function BookingConfirmPage() {
               <Hotel className="h-5 w-5 text-accent" />
               Resumen
             </h2>
+
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Habitacion ({nights} noche{nights > 1 ? "s" : ""})</span>
-                <span className="font-bold">${roomTotal}</span>
+                <span className="text-muted-foreground">
+                  Habitaciones ({nights} noche{nights > 1 ? "s" : ""})
+                </span>
+                <span className="font-bold">${roomsTotal}</span>
               </div>
+
               {svcTotal > 0 && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Servicios</span>
                   <span className="font-bold">${svcTotal}</span>
                 </div>
               )}
+
               <Separator />
+
               <div className="flex justify-between text-base">
                 <span className="font-bold">Total</span>
                 <span className="text-xl font-bold text-accent">${grandTotal}</span>
               </div>
             </div>
+
             <Button
               onClick={() => router.push("/booking/payment")}
               className="mt-6 w-full bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl py-3 h-auto text-base font-bold"

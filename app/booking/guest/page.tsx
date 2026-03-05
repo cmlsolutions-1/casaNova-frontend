@@ -12,7 +12,7 @@ import type { GuestInfo } from "@/lib/mock-data"
 
 export default function BookingGuestPage() {
   const router = useRouter()
-  const { booking, setGuestInfo } = useBooking()
+  const { booking, setGuestInfo, hydrated } = useBooking()
 
   const [form, setForm] = useState<GuestInfo>({
     name: "",
@@ -23,28 +23,40 @@ export default function BookingGuestPage() {
     address: "",
     birthDay: "",
   })
+
   const [errors, setErrors] = useState<Partial<Record<keyof GuestInfo, string>>>({})
 
   useEffect(() => {
-    if (!booking.selectedRoom) {
+    // ✅ no validar hasta que el context esté hidratado
+    if (!hydrated) return
+
+    // ✅ ahora la validación es por selectedRooms
+    if (!booking.selectedRooms || booking.selectedRooms.length === 0) {
       router.push("/")
       return
     }
+
+    // si ya había guestInfo, precargar
     if (booking.guestInfo) {
       setForm(booking.guestInfo)
     }
-  }, [booking.selectedRoom, booking.guestInfo, router])
+  }, [hydrated, booking.selectedRooms, booking.guestInfo, router])
 
   const validate = (): boolean => {
     const errs: Partial<Record<keyof GuestInfo, string>> = {}
+
     if (!form.name.trim()) errs.name = "Nombre requerido"
+
     if (!form.email.trim()) errs.email = "Email requerido"
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = "Email invalido"
-    if (!form.phone.trim()) errs.phone = "Telefono requerido"
-    else if (!/^[\d\s+()-]{7,20}$/.test(form.phone)) errs.phone = "Telefono invalido"
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = "Email inválido"
+
+    if (!form.phone.trim()) errs.phone = "Teléfono requerido"
+    else if (!/^[\d\s+()-]{7,20}$/.test(form.phone)) errs.phone = "Teléfono inválido"
+
     if (!form.documentNumber.trim()) errs.documentNumber = "Documento requerido"
-    if (!form.address.trim()) errs.address = "Direccion requerida"
+    if (!form.address.trim()) errs.address = "Dirección requerida"
     if (!form.birthDay) errs.birthDay = "Fecha de nacimiento requerida"
+
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -52,13 +64,18 @@ export default function BookingGuestPage() {
   const handleContinue = () => {
     if (!validate()) return
     setGuestInfo(form)
-    router.push("/booking/confirm")
+
+    // ✅ para evitar carreras de estado, navega en el siguiente tick
+    setTimeout(() => router.push("/booking/confirm"), 0)
   }
 
   const updateField = (field: keyof GuestInfo, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }))
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }))
   }
+
+  // opcional: evita render raro antes de hidratar
+  if (!hydrated) return null
 
   return (
     <div>
@@ -68,9 +85,9 @@ export default function BookingGuestPage() {
         </div>
         <div>
           <h1 className="font-serif text-2xl font-bold text-foreground md:text-3xl">
-            Datos del Huesped
+            Datos del Huésped
           </h1>
-          <p className="text-sm text-muted-foreground">Complete su informacion personal</p>
+          <p className="text-sm text-muted-foreground">Complete su información personal</p>
         </div>
       </div>
 
@@ -82,7 +99,7 @@ export default function BookingGuestPage() {
               id="name"
               value={form.name}
               onChange={(e) => updateField("name", e.target.value)}
-              placeholder="Juan Carlos Perez"
+              placeholder="Juan Carlos Pérez"
               className="mt-1.5 rounded-xl"
             />
             {errors.name && <p className="mt-1 text-xs text-destructive">{errors.name}</p>}
@@ -102,7 +119,7 @@ export default function BookingGuestPage() {
           </div>
 
           <div>
-            <Label htmlFor="phone">Telefono *</Label>
+            <Label htmlFor="phone">Teléfono *</Label>
             <Input
               id="phone"
               value={form.phone}
@@ -120,8 +137,8 @@ export default function BookingGuestPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="CC">Cedula de Ciudadania</SelectItem>
-                <SelectItem value="CE">Cedula de Extranjeria</SelectItem>
+                <SelectItem value="CC">Cédula de Ciudadanía</SelectItem>
+                <SelectItem value="CE">Cédula de Extranjería</SelectItem>
                 <SelectItem value="PAS">Pasaporte</SelectItem>
                 <SelectItem value="NIT">NIT</SelectItem>
               </SelectContent>
@@ -129,7 +146,7 @@ export default function BookingGuestPage() {
           </div>
 
           <div>
-            <Label htmlFor="documentNumber">Numero de documento *</Label>
+            <Label htmlFor="documentNumber">Número de documento *</Label>
             <Input
               id="documentNumber"
               value={form.documentNumber}
@@ -137,16 +154,18 @@ export default function BookingGuestPage() {
               placeholder="1234567890"
               className="mt-1.5 rounded-xl"
             />
-            {errors.documentNumber && <p className="mt-1 text-xs text-destructive">{errors.documentNumber}</p>}
+            {errors.documentNumber && (
+              <p className="mt-1 text-xs text-destructive">{errors.documentNumber}</p>
+            )}
           </div>
 
           <div className="md:col-span-2">
-            <Label htmlFor="address">Direccion *</Label>
+            <Label htmlFor="address">Dirección *</Label>
             <Input
               id="address"
               value={form.address}
               onChange={(e) => updateField("address", e.target.value)}
-              placeholder="Calle 100 #15-30, Bogota"
+              placeholder="Calle 100 #15-30, Bogotá"
               className="mt-1.5 rounded-xl"
             />
             {errors.address && <p className="mt-1 text-xs text-destructive">{errors.address}</p>}
@@ -167,14 +186,11 @@ export default function BookingGuestPage() {
       </div>
 
       <div className="mt-8 flex justify-between">
-        <Button
-          variant="outline"
-          onClick={() => router.push("/booking/services")}
-          className="rounded-xl px-6"
-        >
+        <Button variant="outline" onClick={() => router.push("/booking/services")} className="rounded-xl px-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Atras
+          Atrás
         </Button>
+
         <Button
           onClick={handleContinue}
           className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl px-8 py-3 h-auto font-semibold"
