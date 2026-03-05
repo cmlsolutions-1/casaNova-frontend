@@ -1,3 +1,5 @@
+//app/booking/success/page.tsx
+
 "use client"
 
 import { useSearchParams } from "next/navigation"
@@ -71,7 +73,7 @@ export default function BookingSuccessPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Habitacion</span>
-              <span className="text-foreground">{room?.name || reservation.roomId}</span>
+              <span className="text-foreground">{room?.nameRoom || reservation.roomId}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Fechas</span>

@@ -1,8 +1,6 @@
 "use client"
 
-import React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useBooking } from "@/lib/booking-context"
 import { Button } from "@/components/ui/button"
@@ -11,60 +9,175 @@ import { Label } from "@/components/ui/label"
 import { CreditCard, Building2, Banknote, ArrowLeft, Lock, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+import { upsertClientPublicService } from "@/services/client.service"
+import { createReservationPublicService } from "@/services/reservation.service"
+import { listServicesPublicService, type BackendService } from "@/services/service.service"
+
 type PayMethod = "card" | "pse" | "cash"
 
 export default function BookingPaymentPage() {
   const router = useRouter()
-  const { booking, services, createReservation } = useBooking()
+  const { booking, hydrated } = useBooking()
+
   const [method, setMethod] = useState<PayMethod>("card")
   const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
 
-  const { searchParams: sp, selectedRoom: room, selectedServices } = booking
+  const { searchParams: sp, selectedRooms, selectedServices, guestInfo } = booking
 
+  const [servicesCatalog, setServicesCatalog] = useState<BackendService[]>([])
+  const [loadingCatalog, setLoadingCatalog] = useState(false)
+
+  // ✅ 1) Esperar hidratación y luego validar
   useEffect(() => {
-    if (!room || !sp || !booking.guestInfo) {
+    if (!hydrated) return
+    if (!sp || !guestInfo || !selectedRooms || selectedRooms.length === 0) {
       router.push("/")
     }
-  }, [room, sp, booking.guestInfo, router])
+  }, [hydrated, sp, guestInfo, selectedRooms, router])
 
-  if (!room || !sp) return null
+  // ✅ 2) Cargar catálogo de servicios para que el resumen sea igual al confirm
+  useEffect(() => {
+    if (!hydrated) return
+    let alive = true
+    ;(async () => {
+      try {
+        setLoadingCatalog(true)
+        const data = await listServicesPublicService()
+        if (!alive) return
+        setServicesCatalog(Array.isArray(data) ? data : [])
+      } catch {
+        if (!alive) return
+        setServicesCatalog([])
+      } finally {
+        if (alive) setLoadingCatalog(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [hydrated])
 
-  const start = new Date(sp.startDate)
-  const end = new Date(sp.endDate)
-  const nights = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
-  const svcTotal = selectedServices.reduce((sum, s) => {
-    const svc = services.find((sv) => sv.id === s.serviceId)
-    return sum + (svc ? svc.price * s.amount : 0)
-  }, 0)
-  const grandTotal = room.price * nights + svcTotal
+  // mientras hidrata, muestra loading (evita “no llega info”)
+  if (!hydrated) {
+    return <p className="text-muted-foreground">Cargando...</p>
+  }
+
+  // si ya hidrató y falta data -> el useEffect ya redirecciona
+  if (!sp || !guestInfo || !selectedRooms || selectedRooms.length === 0) return null
+
+  const nights = useMemo(() => {
+    const start = new Date(sp.startDate)
+    const end = new Date(sp.endDate)
+    return Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
+  }, [sp.startDate, sp.endDate])
+
+  const roomsPerNight = useMemo(
+    () => selectedRooms.reduce((sum: number, r: any) => sum + (r.price ?? 0), 0),
+    [selectedRooms],
+  )
+
+  const roomsTotal = roomsPerNight * nights
+
+  const svcTotal = useMemo(() => {
+    return (selectedServices ?? []).reduce((sum, s) => {
+      const svc = servicesCatalog.find((sv) => sv.id === s.serviceId)
+      return sum + (svc ? svc.price * s.amount : 0)
+    }, 0)
+  }, [selectedServices, servicesCatalog])
+
+  const grandTotal = roomsTotal + svcTotal
 
   const handlePay = async () => {
     setLoading(true)
-    // Simulate payment delay
-    await new Promise((r) => setTimeout(r, 2000))
-    const resId = createReservation({ method })
+    setErr(null)
+
+    try {
+      // 1) upsert client (publico)
+      const clientRes = await upsertClientPublicService({
+        name: guestInfo.name,
+        email: guestInfo.email,
+        phone: guestInfo.phone,
+        documentType: guestInfo.documentType,
+        documentNumber: guestInfo.documentNumber,
+        address: guestInfo.address,
+        birthDate: new Date(guestInfo.birthDay).toISOString(),
+      })
+
+      if (!clientRes?.ok) {
+        throw new Error(clientRes?.message || "No se pudo crear/actualizar el cliente")
+      }
+
+      // 2) create reservation (publico)
+      const startISO = new Date(sp.startDate).toISOString()
+      const endISO = new Date(sp.endDate).toISOString()
+
+      const roomsPayload = selectedRooms.map((r: any, idx: number) => {
+      const roomEntry: any = {
+        roomId: r.id,
+        numberOfPeople: idx === 0 ? sp.adults : 0, // ✅ adultos
+        children: idx === 0 ? sp.kids : 0,         // ✅ niños
+        babys: idx === 0 ? sp.babies : 0,          // ✅ bebés
+      }
+
+      // pets: solo si > 0
+      if (idx === 0 && sp.pets > 0) roomEntry.pets = sp.pets
+
+      return roomEntry
+    })
+
+    const servicesPayload = (selectedServices ?? []).map((s: any) => ({
+      serviceId: s.serviceId,
+      amount: s.amount,
+      startAt: startISO,
+      endAt: endISO,
+    }))
+
+      const reservationRes = await createReservationPublicService({
+        startDate: new Date(sp.startDate).toISOString(),
+        endDate: new Date(sp.endDate).toISOString(),
+        clientDocument: guestInfo.documentNumber,
+        rooms: roomsPayload,
+        services: servicesPayload,
+      })
+
+      if (!reservationRes?.ok) {
+        throw new Error(reservationRes?.message || "No se pudo crear la reserva")
+      }
+
+      const reservationId = reservationRes.data?.id
+      if (!reservationId) throw new Error("El backend no devolvió id de reserva")
+
+      router.push(`/booking/success?id=${reservationId}`)
+    } catch (e: any) {
+      setErr(e?.message ?? "Ocurrió un error procesando el pago")
+      setLoading(false)
+      return
+    }
+
     setLoading(false)
-    router.push(`/booking/success?id=${resId}`)
   }
 
   const methods: { id: PayMethod; label: string; icon: React.ElementType; desc: string }[] = [
-    { id: "card", label: "Tarjeta de Credito", icon: CreditCard, desc: "Visa, Mastercard, Amex" },
+    { id: "card", label: "Tarjeta de Crédito", icon: CreditCard, desc: "Visa, Mastercard, Amex" },
     { id: "pse", label: "PSE / Transferencia", icon: Building2, desc: "Transferencia bancaria" },
-    { id: "cash", label: "Efectivo", icon: Banknote, desc: "Pago en recepcion" },
+    { id: "cash", label: "Efectivo", icon: Banknote, desc: "Pago en recepción" },
   ]
 
   return (
     <div>
-      <h1 className="font-serif text-2xl font-bold text-foreground md:text-3xl mb-2">
-        Metodo de Pago
-      </h1>
-      <p className="text-muted-foreground mb-8">
-        Seleccione como desea realizar el pago de su reserva.
-      </p>
+      <h1 className="font-serif text-2xl font-bold text-foreground md:text-3xl mb-2">Método de Pago</h1>
+      <p className="text-muted-foreground mb-8">Seleccione cómo desea realizar el pago de su reserva.</p>
+
+      {err && (
+        <div className="mb-6 rounded-2xl border border-destructive/30 bg-destructive/10 p-4">
+          <p className="font-semibold text-foreground">No pudimos procesar tu reserva</p>
+          <p className="mt-1 text-sm text-muted-foreground">{err}</p>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          {/* Method selection */}
           <div className="grid gap-3 sm:grid-cols-3">
             {methods.map((m) => {
               const Icon = m.icon
@@ -88,17 +201,16 @@ export default function BookingPaymentPage() {
             })}
           </div>
 
-          {/* Card form mock */}
           {method === "card" && (
             <div className="rounded-2xl bg-card p-6 shadow">
               <h3 className="mb-4 font-bold text-card-foreground">Datos de la Tarjeta</h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
-                  <Label htmlFor="cardNumber">Numero de tarjeta</Label>
+                  <Label htmlFor="cardNumber">Número de tarjeta</Label>
                   <Input id="cardNumber" placeholder="4242 4242 4242 4242" className="mt-1.5 rounded-xl" />
                 </div>
                 <div>
-                  <Label htmlFor="cardExp">Fecha de expiracion</Label>
+                  <Label htmlFor="cardExp">Fecha de expiración</Label>
                   <Input id="cardExp" placeholder="MM/AA" className="mt-1.5 rounded-xl" />
                 </div>
                 <div>
@@ -135,8 +247,7 @@ export default function BookingPaymentPage() {
                 <Banknote className="mx-auto h-12 w-12 text-accent mb-3" />
                 <h3 className="font-bold text-card-foreground">Pago en Efectivo</h3>
                 <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
-                  Su reserva quedara confirmada una vez realice el pago en la recepcion del hotel
-                  al momento de su llegada.
+                  Tu reserva quedará registrada. El pago se realizará en recepción al momento de tu llegada.
                 </p>
               </div>
             </div>
@@ -144,30 +255,37 @@ export default function BookingPaymentPage() {
 
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Shield className="h-4 w-4 text-green-600" />
-            <span>Transaccion segura. Sus datos estan protegidos con encriptacion SSL.</span>
+            <span>Transacción segura. Datos protegidos con SSL.</span>
           </div>
         </div>
 
-        {/* Summary */}
         <div>
           <div className="sticky top-28 rounded-2xl bg-card p-6 shadow-lg">
             <h2 className="mb-4 font-bold text-card-foreground">Total a Pagar</h2>
+
+            {loadingCatalog && (
+              <p className="mb-3 text-xs text-muted-foreground">Cargando servicios para el resumen...</p>
+            )}
+
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">{room.name} x {nights}n</span>
-                <span className="font-bold">${room.price * nights}</span>
+                <span className="text-muted-foreground">Habitaciones ({nights} noche{nights > 1 ? "s" : ""})</span>
+                <span className="font-bold">${roomsTotal}</span>
               </div>
+
               {svcTotal > 0 && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Servicios</span>
                   <span className="font-bold">${svcTotal}</span>
                 </div>
               )}
+
               <div className="border-t border-border pt-2 mt-2 flex justify-between text-base">
                 <span className="font-bold">Total</span>
                 <span className="text-xl font-bold text-accent">${grandTotal}</span>
               </div>
             </div>
+
             <Button
               onClick={handlePay}
               disabled={loading}
@@ -181,7 +299,7 @@ export default function BookingPaymentPage() {
               ) : (
                 <>
                   <Lock className="mr-2 h-4 w-4" />
-                  Pagar ${grandTotal}
+                  Confirmar y pagar ${grandTotal}
                 </>
               )}
             </Button>
@@ -190,11 +308,7 @@ export default function BookingPaymentPage() {
       </div>
 
       <div className="mt-8">
-        <Button
-          variant="outline"
-          onClick={() => router.push("/booking/confirm")}
-          className="rounded-xl px-6"
-        >
+        <Button variant="outline" onClick={() => router.push("/booking/confirm")} className="rounded-xl px-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Volver
         </Button>
