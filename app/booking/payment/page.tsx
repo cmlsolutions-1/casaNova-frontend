@@ -1,3 +1,4 @@
+//app/booking/payment/page.tsx
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
@@ -12,6 +13,7 @@ import { cn } from "@/lib/utils"
 import { upsertClientPublicService } from "@/services/client.service"
 import { createReservationPublicService } from "@/services/reservation.service"
 import { listServicesPublicService, type BackendService } from "@/services/service.service"
+import { createPaymentPublicService } from "@/services/payment.service"
 
 type PayMethod = "card" | "pse" | "cash"
 
@@ -89,38 +91,37 @@ export default function BookingPaymentPage() {
   const grandTotal = roomsTotal + svcTotal
 
   const handlePay = async () => {
-    setLoading(true)
-    setErr(null)
+  setLoading(true)
+  setErr(null)
 
-    try {
-      // 1) upsert client (publico)
-      const clientRes = await upsertClientPublicService({
-        name: guestInfo.name,
-        email: guestInfo.email,
-        phone: guestInfo.phone,
-        documentType: guestInfo.documentType,
-        documentNumber: guestInfo.documentNumber,
-        address: guestInfo.address,
-        birthDate: new Date(guestInfo.birthDay).toISOString(),
-      })
+  try {
+    // 1) Crear/actualizar cliente
+    const clientRes = await upsertClientPublicService({
+      name: guestInfo.name,
+      email: guestInfo.email,
+      phone: guestInfo.phone,
+      documentType: guestInfo.documentType,
+      documentNumber: guestInfo.documentNumber,
+      address: guestInfo.address,
+      birthDate: new Date(guestInfo.birthDay).toISOString(),
+    })
 
-      if (!clientRes?.ok) {
-        throw new Error(clientRes?.message || "No se pudo crear/actualizar el cliente")
-      }
+    if (!clientRes?.ok) {
+      throw new Error(clientRes?.message || "No se pudo crear/actualizar el cliente")
+    }
 
-      // 2) create reservation (publico)
-      const startISO = new Date(sp.startDate).toISOString()
-      const endISO = new Date(sp.endDate).toISOString()
+    // 2) Crear reserva
+    const startISO = new Date(sp.startDate).toISOString()
+    const endISO = new Date(sp.endDate).toISOString()
 
-      const roomsPayload = selectedRooms.map((r: any, idx: number) => {
+    const roomsPayload = selectedRooms.map((r: any, idx: number) => {
       const roomEntry: any = {
         roomId: r.id,
-        numberOfPeople: idx === 0 ? sp.adults : 0, 
-        children: idx === 0 ? sp.kids : 0,         
-        babys: idx === 0 ? sp.babies : 0,          
+        numberOfPeople: idx === 0 ? sp.adults : 0,
+        children: idx === 0 ? sp.kids : 0,
+        babys: idx === 0 ? sp.babies : 0,
       }
 
-      // pets: solo si > 0
       if (idx === 0 && sp.pets > 0) roomEntry.pets = sp.pets
 
       return roomEntry
@@ -133,30 +134,45 @@ export default function BookingPaymentPage() {
       endAt: endISO,
     }))
 
-      const reservationRes = await createReservationPublicService({
-        startDate: new Date(sp.startDate).toISOString(),
-        endDate: new Date(sp.endDate).toISOString(),
-        clientDocument: guestInfo.documentNumber,
-        rooms: roomsPayload,
-        services: servicesPayload,
-      })
+    const reservationRes = await createReservationPublicService({
+      startDate: startISO,
+      endDate: endISO,
+      clientDocument: guestInfo.documentNumber,
+      rooms: roomsPayload,
+      services: servicesPayload,
+    })
 
-      if (!reservationRes?.ok) {
-        throw new Error(reservationRes?.message || "No se pudo crear la reserva")
-      }
-
-      const reservationId = reservationRes.data?.id
-      if (!reservationId) throw new Error("El backend no devolvió id de reserva")
-
-      router.push(`/booking/success?id=${reservationId}`)
-    } catch (e: any) {
-      setErr(e?.message ?? "Ocurrió un error procesando el pago")
-      setLoading(false)
-      return
+    if (!reservationRes?.ok) {
+      throw new Error(reservationRes?.message || "No se pudo crear la reserva")
     }
 
+    const reservationId = reservationRes.data?.id
+    if (!reservationId) throw new Error("El backend no devolvió id de reserva")
+
+    // 3) Crear preferencia de pago Mercado Pago
+    const paymentRes = await createPaymentPublicService({
+      reservationId,
+    })
+
+    if (!paymentRes?.ok) {
+      throw new Error(paymentRes?.message || "No se pudo crear el pago")
+    }
+
+    const checkoutUrl =
+      paymentRes.data?.sandboxInitPoint || paymentRes.data?.initPoint
+
+    if (!checkoutUrl) {
+      throw new Error("El backend no devolvió el link de pago")
+    }
+
+    // 4) Redirigir a Mercado Pago
+    window.location.href = checkoutUrl
+  } catch (e: any) {
+    setErr(e?.message ?? "Ocurrió un error procesando el pago")
     setLoading(false)
+    return
   }
+}
 
   const methods: { id: PayMethod; label: string; icon: React.ElementType; desc: string }[] = [
     { id: "card", label: "Tarjeta de Crédito", icon: CreditCard, desc: "Visa, Mastercard, Amex" },

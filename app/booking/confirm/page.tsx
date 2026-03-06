@@ -12,6 +12,9 @@ import { parseISO, format } from "date-fns"
 import { es } from "date-fns/locale"
 
 import { listServicesPublicService, type BackendService } from "@/services/service.service"
+import { upsertClientPublicService } from "@/services/client.service"
+import { createReservationPublicService } from "@/services/reservation.service"
+import { createPaymentPublicService } from "@/services/payment.service"
 
 export default function BookingConfirmPage() {
   const router = useRouter()
@@ -20,6 +23,159 @@ export default function BookingConfirmPage() {
 
   const [servicesFromApi, setServicesFromApi] = useState<BackendService[]>([])
   const [loadingServices, setLoadingServices] = useState(true)
+
+  const [paying, setPaying] = useState(false)
+  const [payError, setPayError] = useState<string | null>(null)
+
+  const handleGoToMercadoPago = async () => {
+  if (!sp || !guestInfo || !selectedRooms || selectedRooms.length === 0) return
+
+  setPaying(true)
+  setPayError(null)
+
+  try {
+    // 1) crear / actualizar cliente
+    const clientRes = await upsertClientPublicService({
+      name: guestInfo.name,
+      email: guestInfo.email,
+      phone: guestInfo.phone,
+      documentType: guestInfo.documentType,
+      documentNumber: guestInfo.documentNumber,
+      address: guestInfo.address,
+      birthDate: new Date(guestInfo.birthDay).toISOString(),
+    })
+
+    if (!clientRes?.ok) {
+      throw new Error(clientRes?.message || "No se pudo crear/actualizar el cliente")
+    }
+
+    // 2) crear reserva
+    const startISO = new Date(sp.startDate).toISOString()
+    const endISO = new Date(sp.endDate).toISOString()
+
+    const roomsPayload: Array<{
+      roomId: string
+      numberOfPeople: number
+      children?: number
+      babys?: number
+      pets?: number
+    }> = []
+
+    let remainingAdults = sp.adults
+    let remainingKids = sp.kids
+    let remainingBabies = sp.babies
+    let remainingPets = sp.pets
+
+    for (const room of selectedRooms as any[]) {
+      const capacity = Number(room.capacity ?? 0)
+      let used = 0
+
+      const roomEntry: any = {
+        roomId: room.id,
+      }
+
+      const adultsHere = Math.min(remainingAdults, capacity - used)
+      if (adultsHere > 0) {
+        roomEntry.numberOfPeople = adultsHere
+        used += adultsHere
+        remainingAdults -= adultsHere
+      }
+
+      const kidsHere = Math.min(remainingKids, capacity - used)
+      if (kidsHere > 0) {
+        roomEntry.children = kidsHere
+        used += kidsHere
+        remainingKids -= kidsHere
+      }
+
+      const babiesHere = Math.min(remainingBabies, capacity - used)
+      if (babiesHere > 0) {
+        roomEntry.babys = babiesHere
+        used += babiesHere
+        remainingBabies -= babiesHere
+      }
+
+      const petsHere = Math.min(remainingPets, capacity - used)
+      if (petsHere > 0) {
+        roomEntry.pets = petsHere
+        used += petsHere
+        remainingPets -= petsHere
+      }
+
+      // solo agrega habitaciones realmente ocupadas
+      if (used > 0) {
+        if (roomEntry.numberOfPeople === undefined) {
+          roomEntry.numberOfPeople = 0
+        }
+        roomsPayload.push(roomEntry)
+      }
+    }
+
+    // validación extra
+    if (
+      remainingAdults > 0 ||
+      remainingKids > 0 ||
+      remainingBabies > 0 ||
+      remainingPets > 0
+    ) {
+      throw new Error(
+        "No se pudo distribuir correctamente la cantidad de huéspedes en las habitaciones seleccionadas.",
+      )
+    }
+
+  const servicesPayload =
+  (selectedServices ?? []).length > 0
+    ? (selectedServices ?? []).map((s: any) => ({
+        serviceId: s.serviceId,
+        amount: s.amount,
+      }))
+    : undefined
+
+  const reservationBody = {
+    startDate: startISO,
+    endDate: endISO,
+    clientDocument: guestInfo.documentNumber,
+    rooms: roomsPayload,
+    ...(servicesPayload ? { services: servicesPayload } : {}),
+  }
+
+  console.log("BODY RESERVATION =>", reservationBody)
+
+  const reservationRes = await createReservationPublicService(reservationBody)
+
+    if (!reservationRes?.ok) {
+      throw new Error(reservationRes?.message || "No se pudo crear la reserva")
+    }
+
+    const reservationId = reservationRes.data?.id
+    if (!reservationId) {
+      throw new Error("El backend no devolvió id de reserva")
+    }
+
+    // 3) crear pago mercado pago
+    const paymentRes = await createPaymentPublicService({
+      reservationId,
+    })
+
+    if (!paymentRes?.ok) {
+      throw new Error(paymentRes?.message || "No se pudo generar el link de pago")
+    }
+
+    const checkoutUrl =
+      paymentRes.data?.sandboxInitPoint || paymentRes.data?.initPoint
+
+    if (!checkoutUrl) {
+      throw new Error("No se recibió el link de pago de Mercado Pago")
+    }
+
+    // 4) redirigir a mercado pago
+    window.location.href = checkoutUrl
+  } catch (e: any) {
+    console.error("Error en proceso de pago:", e)
+    setPayError(e?.message ?? "Ocurrió un error redirigiendo al pago")
+    setPaying(false)
+  }
+}
 
   useEffect(() => {
     if (!sp || !guestInfo || !selectedRooms || selectedRooms.length === 0) {
@@ -277,12 +433,17 @@ export default function BookingConfirmPage() {
               </div>
             </div>
 
+            {payError && (
+              <p className="mt-4 text-sm text-red-500">{payError}</p>
+            )}
+
             <Button
-              onClick={() => router.push("/booking/payment")}
+              onClick={handleGoToMercadoPago}
+              disabled={paying}
               className="mt-6 w-full bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl py-3 h-auto text-base font-bold"
             >
-              Ir a Pagar
-              <ArrowRight className="ml-2 h-4 w-4" />
+              {paying ? "Redirigiendo a Mercado Pago..." : "Ir a Pagar"}
+              {!paying && <ArrowRight className="ml-2 h-4 w-4" />}
             </Button>
           </div>
         </div>
