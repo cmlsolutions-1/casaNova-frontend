@@ -162,7 +162,7 @@ export default function BookingConfirmPage() {
     }
 
     const checkoutUrl =
-      paymentRes.data?.sandboxInitPoint || paymentRes.data?.initPoint
+      paymentRes.data?.initPoint || paymentRes.data?.sandboxInitPoint
 
     if (!checkoutUrl) {
       throw new Error("No se recibió el link de pago de Mercado Pago")
