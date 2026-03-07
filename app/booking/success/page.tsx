@@ -30,34 +30,41 @@ export default function BookingSuccessPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!resId) {
-      setLoading(false)
-      setError("No se recibió id de reserva")
-      return
-    }
+  if (!resId) {
+    setLoading(false)
+    setError("No se recibió id de reserva")
+    return
+  }
 
-    let alive = true
+  let alive = true
 
-    ;(async () => {
-      try {
-        const res = await getReservationByIdPublicService(resId)
-        if (!alive) return
-        if (!res?.ok) {
-          throw new Error(res?.message || "No se pudo consultar la reserva")
-        }
-        setReservation(res.data)
-      } catch (e: any) {
-        if (!alive) return
-        setError(e?.message || "No se pudo consultar la reserva")
-      } finally {
-        if (alive) setLoading(false)
+  ;(async () => {
+    try {
+      console.log("ID RECIBIDO EN SUCCESS:", resId)
+
+      const res = await getReservationByIdPublicService(resId)
+      if (!alive) return
+
+      console.log("RESPUESTA COMPLETA RESERVA:", res)
+
+      if (!res?.ok || !res?.data) {
+        throw new Error(res?.message || "No se pudo consultar la reserva")
       }
-    })()
 
-    return () => {
-      alive = false
+      setReservation(res.data)
+    } catch (e: any) {
+      if (!alive) return
+      console.error("ERROR SUCCESS PAGE:", e)
+      setError(e?.message || "No se pudo consultar la reserva")
+    } finally {
+      if (alive) setLoading(false)
     }
-  }, [resId])
+  })()
+
+  return () => {
+    alive = false
+  }
+}, [resId])
 
   if (loading) {
     return (

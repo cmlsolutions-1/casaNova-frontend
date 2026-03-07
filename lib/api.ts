@@ -18,12 +18,19 @@ function buildHeaders(
 ) {
   const h = new Headers(initHeaders)
 
-  // SOLO setear JSON si NO es FormData
   if (!opts?.isFormData && !h.has("Content-Type")) {
     h.set("Content-Type", "application/json")
   }
 
-  if (extra) for (const [k, v] of Object.entries(extra)) h.set(k, v)
+  // evita la página HTML de advertencia de ngrok
+  if (!h.has("ngrok-skip-browser-warning")) {
+    h.set("ngrok-skip-browser-warning", "1")
+  }
+
+  if (extra) {
+    for (const [k, v] of Object.entries(extra)) h.set(k, v)
+  }
+
   return h
 }
 
