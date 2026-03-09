@@ -1,6 +1,9 @@
 //app/booking/confirm/page.tsx
 
 "use client"
+import Link from "next/link"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -18,14 +21,18 @@ import { createPaymentPublicService } from "@/services/payment.service"
 
 export default function BookingConfirmPage() {
   const router = useRouter()
-  const { booking } = useBooking()
+  const { booking, setBookingConsents } = useBooking()
   const { searchParams: sp, selectedRooms, selectedServices, guestInfo } = booking
+
+  const acceptedTerms = booking.consents?.acceptedTerms ?? false
+  const acceptedMinorsPolicy = booking.consents?.acceptedMinorsPolicy ?? false
 
   const [servicesFromApi, setServicesFromApi] = useState<BackendService[]>([])
   const [loadingServices, setLoadingServices] = useState(true)
 
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
+  
 
   const handleGoToMercadoPago = async () => {
   if (!sp || !guestInfo || !selectedRooms || selectedRooms.length === 0) return
@@ -237,6 +244,8 @@ export default function BookingConfirmPage() {
   const totalPeople = sp.adults + sp.kids + sp.babies
   const capacityTotal = selectedRooms.reduce((sum: number, r: any) => sum + (r.capacity ?? 0), 0)
 
+  const canProceedToPay = acceptedTerms && acceptedMinorsPolicy && !paying
+
   return (
     <div>
       <h1 className="font-serif text-2xl font-bold text-foreground md:text-3xl mb-2">
@@ -437,10 +446,61 @@ export default function BookingConfirmPage() {
               <p className="mt-4 text-sm text-red-500">{payError}</p>
             )}
 
+            <div className="mt-6 space-y-4 rounded-xl border border-border bg-muted/40 p-4">
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="accept-terms"
+                checked={acceptedTerms}
+                onCheckedChange={(checked) => setBookingConsents ({ acceptedTerms: checked === true })}
+                className="mt-1"
+              />
+              <div className="space-y-1">
+                <Label
+                  htmlFor="accept-terms"
+                  className="text-sm font-medium leading-relaxed text-foreground cursor-pointer"
+                >
+                  Acepto los términos y condiciones de la reserva, políticas de cancelación,
+                  devoluciones y condiciones generales de alojamiento.
+                </Label>
+                <Link
+                  href="/booking/terms"
+                  className="inline-block text-sm font-medium text-accent hover:underline"
+                >
+                  Ver términos y condiciones
+                </Link>
+              </div>
+            </div>
+
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="accept-minors"
+                checked={acceptedMinorsPolicy}
+                onCheckedChange={(checked) => setBookingConsents ({ acceptedMinorsPolicy: checked === true })}
+                className="mt-1"
+              />
+              <div className="space-y-1">
+                <Label
+                  htmlFor="accept-minors"
+                  className="text-sm font-medium leading-relaxed text-foreground cursor-pointer"
+                >
+                  Confirmo que, en caso de ingresar menores de edad, deberán presentar tarjeta
+                  de identidad o registro civil y deberán estar acompañados por su padre o madre.
+                  No se permite el ingreso únicamente con tíos, hermanos u otros acompañantes.
+                </Label>
+              </div>
+            </div>
+
+            {(!acceptedTerms || !acceptedMinorsPolicy) && (
+              <p className="text-xs text-muted-foreground">
+                Debes aceptar ambas condiciones para continuar al pago.
+              </p>
+            )}
+          </div>
+
             <Button
               onClick={handleGoToMercadoPago}
-              disabled={paying}
-              className="mt-6 w-full bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl py-3 h-auto text-base font-bold"
+              disabled={!canProceedToPay}
+              className="mt-6 w-full bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl py-3 h-auto text-base font-bold disabled:opacity-50"
             >
               {paying ? "Redirigiendo a Mercado Pago..." : "Ir a Pagar"}
               {!paying && <ArrowRight className="ml-2 h-4 w-4" />}

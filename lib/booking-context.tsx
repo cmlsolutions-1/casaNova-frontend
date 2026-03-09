@@ -24,14 +24,20 @@ interface SearchParams {
 
 interface BookingState {
   searchParams: SearchParams | null
-  selectedRooms: any[] // 👈 temporal mientras migras todo a tipos backend
+  selectedRooms: any[] 
   selectedServices: SelectedService[]
   guestInfo: GuestInfo | null
+  consents: BookingConsents
 }
 
 interface AdminAuth {
   isAuthenticated: boolean
   user: User | null
+}
+
+interface BookingConsents {
+  acceptedTerms: boolean
+  acceptedMinorsPolicy: boolean
 }
 
 interface BookingContextType {
@@ -64,6 +70,9 @@ interface BookingContextType {
 
   addUser: (user: User) => void
   resetBooking: () => void
+
+  setBookingConsents: (consents: Partial<BookingConsents>) => void
+  resetBookingConsents: () => void
 }
 
 const BookingContext = createContext<BookingContextType | null>(null)
@@ -99,7 +108,12 @@ function normalizeBooking(raw: any): BookingState {
     selectedRooms: [],
     selectedServices: [],
     guestInfo: null,
+    consents: {
+      acceptedTerms: false,
+      acceptedMinorsPolicy: false,
+    },
   }
+
   if (!raw || typeof raw !== "object") return base
 
   const migratedSelectedRooms = Array.isArray(raw.selectedRooms)
@@ -113,6 +127,10 @@ function normalizeBooking(raw: any): BookingState {
     selectedRooms: migratedSelectedRooms,
     selectedServices: Array.isArray(raw.selectedServices) ? raw.selectedServices : [],
     guestInfo: raw.guestInfo ?? null,
+    consents: {
+      acceptedTerms: !!raw.consents?.acceptedTerms,
+      acceptedMinorsPolicy: !!raw.consents?.acceptedMinorsPolicy,
+    },
   }
 }
 
@@ -121,6 +139,10 @@ const defaultBooking: BookingState = {
   selectedRooms: [],
   selectedServices: [],
   guestInfo: null,
+  consents: {
+    acceptedTerms: false,
+    acceptedMinorsPolicy: false,
+  },
 }
 
 export function BookingProvider({ children }: { children: React.ReactNode }) {
@@ -166,6 +188,26 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
       console.error("LOGIN ERROR:", e)
       return false
     }
+  }, [])
+
+    const setBookingConsents = useCallback((consents: Partial<BookingConsents>) => {
+    setBooking((prev) => ({
+      ...prev,
+      consents: {
+        ...prev.consents,
+        ...consents,
+      },
+    }))
+  }, [])
+
+  const resetBookingConsents = useCallback(() => {
+    setBooking((prev) => ({
+      ...prev,
+      consents: {
+        acceptedTerms: false,
+        acceptedMinorsPolicy: false,
+      },
+    }))
   }, [])
 
   const logout = useCallback(async () => {
@@ -345,6 +387,8 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
         logout,
         addUser,
         resetBooking,
+        setBookingConsents,
+        resetBookingConsents,
       }}
     >
       {children}

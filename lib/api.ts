@@ -22,8 +22,10 @@ function buildHeaders(
     h.set("Content-Type", "application/json")
   }
 
-  // evita la página HTML de advertencia de ngrok
-  if (!h.has("ngrok-skip-browser-warning")) {
+  const shouldUseNgrokHeader =
+  API_BASE.includes("ngrok-free.app") || API_BASE.includes("trycloudflare.com")
+
+  if (shouldUseNgrokHeader && !h.has("ngrok-skip-browser-warning")) {
     h.set("ngrok-skip-browser-warning", "1")
   }
 
