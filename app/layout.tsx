@@ -24,6 +24,11 @@ export const metadata: Metadata = {
   title: "Casa Nova Hotel Campestre",
   description:
     "Experiencia de lujo y confort en el mejor hotel de la ciudad. Reserve su estancia perfecta.",
+  icons: {
+    icon: "/LOGO.png",
+    shortcut: "/LOGO.png",
+    apple: "/LOGO.png",
+  },
 }
 
 export default function RootLayout({

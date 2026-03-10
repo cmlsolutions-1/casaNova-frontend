@@ -72,3 +72,28 @@ export async function getReservationByIdPublicService(id: string) {
     method: "GET",
   })
 }
+
+export type ReservationByClientItem = {
+  id: string
+  startDate: string
+  endDate: string
+  status: string
+  totalValue: number | string
+}
+
+export type BackendReservationsByClient = {
+  ok: boolean
+  message: string
+  data: ReservationByClientItem | ReservationByClientItem[]
+  errors: any
+  meta: any
+}
+
+export async function getReservationsByClientDocumentPublicService(clientDocument: string) {
+  return apiFetch<BackendReservationsByClient>(
+    `/api/reservations/get-by-clients/${clientDocument}`,
+    {
+      method: "GET",
+    },
+  )
+}

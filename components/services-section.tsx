@@ -73,8 +73,8 @@ export function ServicesSection() {
             // Si luego agregas `icon` al backend, aquí lo lees.
             const Icon = Sparkles
 
-            // ✅ images = [{id,url}]
-            const img = (service as any)?.images?.[0]?.url || "/placeholder.svg"
+           
+            const img = (service as any)?.images?.[0]?.url || "/LOGO.PNG"
 
             return (
               <div

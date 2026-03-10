@@ -60,6 +60,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
     }
   }, [roomId])
 
+  const remaining = Number(searchParams.get("remaining")) || 0
   // Params de búsqueda (se conservan)
   const start = searchParams.get("start") || booking.searchParams?.startDate || ""
   const end = searchParams.get("end") || booking.searchParams?.endDate || ""
@@ -68,10 +69,27 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
   const babies = Number(searchParams.get("babies")) || booking.searchParams?.babies || 0
   const pets = Number(searchParams.get("pets")) || booking.searchParams?.pets || 0
 
+  const totalRequestedPeople = Number(adults) + Number(kids) + Number(babies)
+
+  const prevCapacity = (booking.selectedRooms ?? []).reduce((sum, r: any) => {
+    return sum + Number(r?.capacity ?? 0)
+  }, 0)
+
+  const remainingBeforeSelection =
+    remaining > 0 ? remaining : Math.max(0, totalRequestedPeople - prevCapacity)
+
+  const selectedPeopleForThisRoom = room
+    ? Math.min(Number(room.capacity ?? 0), remainingBeforeSelection || totalRequestedPeople)
+    : 0
+
+  const roomPricePerNight = room
+    ? Number(room.price ?? 0) * selectedPeopleForThisRoom
+    : 0
+
   // Normaliza urls (backend devuelve [{id,url}])
   const imageUrls = useMemo(() => {
     const urls = (room?.images ?? []).map((x: any) => x?.url).filter(Boolean)
-    return urls.length ? urls : ["/placeholder.svg"]
+    return urls.length ? urls : ["/LOGO.PNG"]
   }, [room])
 
   const prevImg = () => setImgIdx((p) => (p === 0 ? imageUrls.length - 1 : p - 1))
@@ -97,8 +115,16 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
 
     const remaining = Math.max(0, requiredPeople - nextCapacity)
 
+    
+
     // 1) agrega la habitación
-    addSelectedRoom(room as any)
+    const roomWithPricing = {
+      ...room,
+      selectedPeople: selectedPeopleForThisRoom,
+      selectedPricePerNight: roomPricePerNight,
+    }
+
+    addSelectedRoom(roomWithPricing as any)
 
     // 2) si faltan personas -> mensaje + volver a resultados
     if (remaining > 0) {
@@ -159,7 +185,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
         <div className="lg:col-span-3">
           <div className="relative overflow-hidden rounded-2xl">
             <img
-              src={imageUrls[imgIdx] || "/placeholder.svg"}
+              src={imageUrls[imgIdx] || "/LOGO.PNG"}
               alt={`Habitación ${room.nameRoom} - foto ${imgIdx + 1}`}
               className="aspect-[4/3] w-full object-cover"
             />
@@ -212,7 +238,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
                   i === imgIdx ? "border-accent" : "border-transparent opacity-60 hover:opacity-100",
                 )}
               >
-                <img src={img || "/placeholder.svg"} alt="" className="h-16 w-24 object-cover" />
+                <img src={img || "/LOGO.PNG"} alt="" className="h-16 w-24 object-cover" />
               </button>
             ))}
           </div>
@@ -233,10 +259,18 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
               {room.description}
             </p>
 
-            <div className="mt-6 flex items-baseline gap-1">
-              <span className="text-3xl font-bold text-foreground">${room.price}</span>
+            <div className="mt-6">
+            <div className="flex items-baseline gap-1">
+              <span className="text-3xl font-bold text-foreground">
+                ${roomPricePerNight.toLocaleString()}
+              </span>
               <span className="text-muted-foreground">/ noche</span>
             </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {/* ${Number(room.price).toLocaleString()} x persona{selectedPeopleForThisRoom === 1 ? "" : "s"} */}
+              ${Number(room.price).toLocaleString()} x persona
+            </p>
+          </div>
 
             <div className="mt-6 grid grid-cols-2 gap-3">
               <div className="rounded-xl bg-secondary p-3 text-center">

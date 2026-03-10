@@ -73,7 +73,7 @@ export function RoomsPreview() {
 
                     <span className="text-xl font-bold text-foreground">
                       ${room.price}
-                      <span className="text-sm font-normal text-muted-foreground">/noche</span>
+                      <span className="text-sm font-normal text-muted-foreground">/x pers. noche</span>
                     </span>
                   </div>
 

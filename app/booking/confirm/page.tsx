@@ -224,7 +224,14 @@ export default function BookingConfirmPage() {
     }
   })()
 
-  const roomsPerNight = selectedRooms.reduce((sum: number, r: any) => sum + (r.price ?? 0), 0)
+  const roomsPerNight = selectedRooms.reduce((sum: number, r: any) => {
+  const selectedPeople = Number(r.selectedPeople ?? 1)
+  const selectedPricePerNight =
+    r.selectedPricePerNight ?? Number(r.price ?? 0) * selectedPeople
+
+    return sum + Number(selectedPricePerNight)
+  }, 0)
+
   const roomsTotal = roomsPerNight * nights
 
   const svcDetails = (selectedServices ?? []).map((s) => {
@@ -326,7 +333,12 @@ export default function BookingConfirmPage() {
                         Capacidad: <span className="font-medium text-foreground">{room.capacity ?? "-"}</span>
                       </p>
                       <p className="mt-1 text-sm font-bold">
-                        ${room.price} <span className="text-muted-foreground font-normal">/ noche</span>
+                        ${(room.selectedPricePerNight ?? Number(room.price ?? 0) * Number(room.selectedPeople ?? 1)).toLocaleString()}
+                        <span className="text-muted-foreground font-normal"> / noche</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {/* ${Number(room.price ?? 0).toLocaleString()} x {Number(room.selectedPeople ?? 1)} persona{Number(room.selectedPeople ?? 1) === 1 ? "" : "s"} */}
+                        ${Number(room.price ?? 0).toLocaleString()} x persona
                       </p>
                     </div>
                   </div>

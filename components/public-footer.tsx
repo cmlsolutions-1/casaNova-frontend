@@ -30,6 +30,9 @@ export function PublicFooter() {
               <Link href="/#search" className="text-sm text-primary-foreground/70 hover:text-accent transition-colors">
                 Reservar
               </Link>
+              <Link href="/booking/check" className="text-sm text-primary-foreground/70 hover:text-accent transition-colors">
+                Consultar Reserva
+              </Link>
               <Link href="/admin/login" className="text-sm text-primary-foreground/70 hover:text-accent transition-colors">
                 Administracion
               </Link>

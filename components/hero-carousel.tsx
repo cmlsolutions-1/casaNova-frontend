@@ -27,7 +27,7 @@ export function HeroCarousel({ images }: HeroCarouselProps) {
 
   return (
     <div className="relative h-[100svh] w-full overflow-hidden">
-      {(hasImages ? safeImages : ["/placeholder.svg"]).map((src, i) => (
+      {(hasImages ? safeImages : ["/LOGO.PNG"]).map((src, i) => (
         <div
           key={`${src}-${i}`}
           className={cn(

@@ -26,7 +26,8 @@ function SearchResults() {
   const pets = Number(searchParams.get("pets")) || 0
   const remaining = Number(searchParams.get("remaining")) || 0
 
-  const people = adults + kids + babies
+  const totalPeople = adults + kids + babies
+  const people = remaining > 0 ? remaining : totalPeople
 
   const [rooms, setRooms] = useState<BackendRoom[]>([])
   const [loading, setLoading] = useState(true)
@@ -161,6 +162,8 @@ function SearchResults() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {rooms.map((room) => {
             const img = room.images?.[0]?.url || "/placeholder.svg"
+            const peopleForThisRoom = Math.min(room.capacity ?? 0, people)
+            const roomPricePerNight = Number(room.price ?? 0) * peopleForThisRoom
 
             return (
               <div
@@ -178,10 +181,14 @@ function SearchResults() {
                 <div className="p-5">
                   <div className="mb-2 flex items-center justify-between">
                     <Badge variant="secondary" className="capitalize text-xs">{room.type}</Badge>
-                    <span className="text-xl font-bold text-foreground">
-                      ${room.price}
-                      <span className="text-sm font-normal text-muted-foreground">/noche</span>
-                    </span>
+                    <div className="text-right">
+                      <span className="text-xl font-bold text-foreground">
+                        ${roomPricePerNight.toLocaleString()}
+                      </span>
+                      <p className="text-xs text-muted-foreground">
+                        ${Number(room.price).toLocaleString()} x {peopleForThisRoom} persona{peopleForThisRoom === 1 ? "" : "s"} / noche
+                      </p>
+                    </div>
                   </div>
 
                   <h3 className="text-lg font-bold text-card-foreground">
@@ -206,7 +213,7 @@ function SearchResults() {
                   </div>
 
                   <Link
-                    href={`/rooms/${room.id}?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}`}
+                    href={`/rooms/${room.id}?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}&remaining=${remaining}`}
                     className="mt-4 block"
                   >
                     <Button className="w-full rounded-xl bg-accent text-accent-foreground hover:bg-accent/90 font-semibold">

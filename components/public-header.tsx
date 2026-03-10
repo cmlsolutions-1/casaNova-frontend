@@ -14,7 +14,7 @@ export function PublicHeader() {
   const links = [
     { href: "/#rooms", label: "Habitaciones" },
     { href: "/#services", label: "Servicios" },
-    { href: "/#search", label: "Reservar" },
+    { href: "/booking/check", label: "Consultar Reserva" },
     { href: "/admin/login", label: "Admin" },
   ]
 
