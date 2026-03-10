@@ -92,7 +92,7 @@ export default function BookingCheckPage() {
               Consulta tus reservas por cédula
             </h1>
             <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-              Ingresa el número de documento del titular para consultar todas las reservas asociadas.
+              Ingresa el número de documento del titular para consultar todas las reservas asociadas
             </p>
           </div>
 
