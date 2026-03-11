@@ -40,36 +40,3 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
  
 
 
-/* type ApiFetchOptions = RequestInit & {
-  auth?: boolean
-}
-
-function joinUrl(base: string, path: string) {
-  const b = (base ?? "").replace(/\/+$/, "")
-  const p = (path ?? "").replace(/^\/+/, "")
-  return `${b}/${p}`
-}
-
-export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || ""
-  const url = baseUrl ? joinUrl(baseUrl, path) : `/${path.replace(/^\/+/, "")}`
-
-  const headers = new Headers(options.headers)
-
-  if (!headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json")
-  }
-
-  if (!headers.has("ngrok-skip-browser-warning")) {
-    headers.set("ngrok-skip-browser-warning", "1")
-  }
-
-  const res = await fetch(url, { ...options, headers })
-  const data = await res.json().catch(() => null)
-
-  if (!res.ok) {
-    throw new Error(data?.message || `HTTP ${res.status}`)
-  }
-
-  return data as T
-} */

@@ -21,6 +21,7 @@ import {
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { canAccessRoute, ROLE_LABEL } from "@/lib/rbac"
+import Image from "next/image"
 
 
 const adminLinks = [
@@ -49,13 +50,23 @@ export function AdminSidebar() {
 
   const sidebar = (
     <div className="flex h-full flex-col bg-primary text-primary-foreground">
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-primary-foreground/10">
-        <Hotel className="h-7 w-7 text-accent" />
+      <div className="flex items-center gap-3 border-b border-primary-foreground/10 px-6 py-5">
+        <div className="flex h-12 w-12 items-center justify-center overflow-hidden">
+          <Image
+            src="/LOGO.png"
+            alt="Logo del hotel"
+            width={40}
+            height={40}
+            className="h-auto w-auto object-contain"
+            priority
+          />
+        </div>
+
         <div>
           <p className="font-serif text-lg font-semibold leading-tight">Casa Nova</p>
           <p className="text-xs text-primary-foreground/60">
-          {adminAuth.user?.role ? ROLE_LABEL[adminAuth.user.role] : ""}
-        </p>
+            {adminAuth.user?.role ? ROLE_LABEL[adminAuth.user.role] : ""}
+          </p>
         </div>
       </div>
 

@@ -1,8 +1,9 @@
+//app/booking/check/page.tsx
 "use client"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Search, ArrowLeft, FileText, CalendarDays, CreditCard } from "lucide-react"
+import { Search, ArrowLeft, FileText, CalendarDays, CreditCard, ShieldCheck } from "lucide-react"
 
 import { PublicHeader } from "@/components/public-header"
 import { PublicFooter } from "@/components/public-footer"
@@ -11,7 +12,10 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
-import { getReservationsByClientDocumentPublicService } from "@/services/reservation.service"
+import { formatDateSpanish } from "@/utils/date"
+import { formatCurrencyCOP } from "@/utils/format"
+
+import { getReservationByClientAndCodePublicService } from "@/services/reservation.service"
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
   PENDING: { label: "Pendiente", variant: "secondary" },
@@ -21,53 +25,82 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   REJECTED: { label: "Rechazada", variant: "destructive" },
 }
 
+type ReservationRoom = {
+  id: string
+  nameRoom: string
+  price: number
+  numberOfPeople: string
+  images: string[]
+}
+
 type ReservationItem = {
   id: string
   startDate: string
   endDate: string
+  reservationCode: number | string
   status: string
   totalValue: number | string
+  client?: {
+    id: string
+    fullName: string
+    documentNumber: string
+  }
+  rooms?: ReservationRoom[]
+  services?: any[]
 }
 
 export default function BookingCheckPage() {
   const router = useRouter()
 
   const [document, setDocument] = useState("")
+  const [code, setCode] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [reservations, setReservations] = useState<ReservationItem[]>([])
+  const [reservation, setReservation] = useState<ReservationItem | null>(null)
 
   const handleSearch = async () => {
     if (!document.trim()) {
       setError("Ingresa tu número de cédula o documento.")
-      setReservations([])
+      setReservation(null)
+      return
+    }
+
+    if (!code.trim()) {
+      setError("Ingresa el código de verificación de la reserva.")
+      setReservation(null)
       return
     }
 
     setLoading(true)
     setError(null)
-    setReservations([])
+    setReservation(null)
 
     try {
-      const res = await getReservationsByClientDocumentPublicService(document.trim())
+      const res = await getReservationByClientAndCodePublicService(
+        document.trim(),
+        code.trim(),
+      )
 
       if (!res?.ok || !res?.data) {
-        throw new Error(res?.message || "No se encontraron reservas")
+        throw new Error(res?.message || "No se encontró la reserva")
       }
 
-      const normalized = Array.isArray(res.data) ? res.data : [res.data]
-
-      if (normalized.length === 0) {
-        throw new Error("No se encontraron reservas para este documento")
-      }
-
-      setReservations(normalized)
+      setReservation(res.data)
     } catch (e: any) {
       setError(e?.message || "No se pudo consultar la reserva")
     } finally {
       setLoading(false)
     }
   }
+
+  const totalGuests =
+  reservation?.rooms?.reduce((acc, room) => {
+    return acc + Number(room.numberOfPeople || 0)
+  }, 0) ?? 0
+
+  console.log("reservation", reservation)
+console.log("rooms", reservation?.rooms)
+console.log("numberOfPeople room 0", reservation?.rooms?.[0]?.numberOfPeople)
 
   return (
     <main>
@@ -89,22 +122,30 @@ export default function BookingCheckPage() {
               Consulta de reserva
             </p>
             <h1 className="font-serif text-3xl font-bold text-foreground md:text-4xl">
-              Consulta tus reservas por cédula
+              Consulta tu reserva
             </h1>
             <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-              Ingresa el número de documento del titular para consultar todas las reservas asociadas
+              Ingresa tu número de documento y el código de verificación para consultar tu reserva
             </p>
           </div>
 
           <Card className="border-border shadow-lg">
             <CardContent className="p-6">
-              <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
                 <Input
                   value={document}
                   onChange={(e) => setDocument(e.target.value)}
                   placeholder="Ingresa tu cédula o documento"
                   className="rounded-xl"
                 />
+
+                <Input
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="Ingresa el código de verificación"
+                  className="rounded-xl"
+                />
+
                 <Button
                   onClick={handleSearch}
                   disabled={loading}
@@ -123,66 +164,107 @@ export default function BookingCheckPage() {
             </CardContent>
           </Card>
 
-          {reservations.length > 0 && (
-            <div className="mt-8">
-              <div className="mb-4 flex items-center gap-2">
-                <FileText className="h-5 w-5 text-accent" />
-                <h2 className="font-serif text-2xl font-bold text-foreground">
-                  Reservas encontradas
-                </h2>
-              </div>
+          {reservation && (
+          <div className="mt-8">
+            <div className="mb-4 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-accent" />
+              <h2 className="font-serif text-2xl font-bold text-foreground">
+                Reserva encontrada
+              </h2>
+            </div>
 
-              <div className="grid gap-4">
-                {reservations.map((reservation) => {
-                  const cfg = statusConfig[reservation.status] || statusConfig.PENDING
+            <Card className="border-border shadow-md">
+              <CardContent className="p-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h3 className="font-bold text-foreground">
+                        Reserva #{reservation.reservationCode ?? "—"}
+                      </h3>
 
-                  return (
-                    <Card key={reservation.id} className="border-border shadow-md">
-                      <CardContent className="p-6">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-3">
-                              <h3 className="font-bold text-foreground">
-                                Reserva #{reservation.id}
-                              </h3>
-                              <Badge variant={cfg.variant}>{cfg.label}</Badge>
-                            </div>
+                      <Badge variant={(statusConfig[reservation.status] || statusConfig.PENDING).variant}>
+                        {(statusConfig[reservation.status] || statusConfig.PENDING).label}
+                      </Badge>
+                    </div>
 
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <CalendarDays className="h-4 w-4 text-accent" />
-                                <span>
-                                  {String(reservation.startDate)} - {String(reservation.endDate)}
-                                </span>
-                              </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <CalendarDays className="h-4 w-4 text-accent" />
+                          <div className="flex flex-col text-sm text-muted-foreground">
+                            <span>
+                              <strong>Fecha de ingreso:</strong>{" "}
+                              {formatDateSpanish(reservation.startDate)}
+                            </span>
 
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <CreditCard className="h-4 w-4 text-accent" />
-                                <span>
-                                  Total:{" "}
-                                  <strong className="text-foreground">
-                                    ${Number(reservation.totalValue || 0).toLocaleString()}
-                                  </strong>
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col gap-2 sm:flex-row">
-                            <Button
-                              variant="outline"
-                              onClick={() => router.push(`/booking/success?id=${reservation.id}`)}
-                              className="rounded-xl"
-                            >
-                              Ver detalle
-                            </Button>
+                              <span>
+                                <strong>Fecha de salida:</strong>{" "}
+                                {formatDateSpanish(reservation.endDate)}
+                              </span>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
+
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <CreditCard className="h-4 w-4 text-accent" />
+                          <span>
+                            Total:{" "}
+                            <strong className="text-foreground">
+                              {formatCurrencyCOP(reservation.totalValue)}
+                            </strong>
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <ShieldCheck className="h-4 w-4 text-accent" />
+                          <span>
+                            Cantidad de personas:{" "}
+                            <strong className="text-foreground">{totalGuests}</strong>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          router.push(
+                            `/booking/success?id=${reservation.id}&document=${document}&code=${code}`
+                          )
+                        }
+                        className="rounded-xl"
+                      >
+                        Ver detalle
+                      </Button>
+                    </div>
+                  </div>
+
+                  {!!reservation.rooms?.length && (
+                    <div className="mt-6">
+                      <h4 className="mb-2 font-semibold text-foreground">Habitaciones</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {reservation.rooms.map((room) => (
+                            <Badge key={room.id} variant="secondary">
+                              {room.nameRoom}
+                            </Badge>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {!!reservation.services?.length && (
+                    <div className="mt-6">
+                      <h4 className="mb-2 font-semibold text-foreground">Servicios</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {reservation.services.map((service, index) => (
+                          <Badge key={`${service}-${index}`} variant="secondary">
+                            {service}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           )}
         </div>

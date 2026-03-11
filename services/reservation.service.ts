@@ -73,25 +73,52 @@ export async function getReservationByIdPublicService(id: string) {
   })
 }
 
+
+export type ReservationRoom = {
+  id: string
+  nameRoom: string
+  price: number
+  numberOfPeople: string
+  images: string[]
+}
+
+export type ReservationClient = {
+  id: string
+  fullName: string
+  documentNumber: string
+}
+
 export type ReservationByClientItem = {
   id: string
   startDate: string
   endDate: string
+  reservationCode: number | string
   status: string
   totalValue: number | string
+  client: ReservationClient
+  rooms: ReservationRoom[]
+  services: any[]
 }
 
-export type BackendReservationsByClient = {
+export type BackendReservationByClientAndCode = {
   ok: boolean
   message: string
-  data: ReservationByClientItem | ReservationByClientItem[]
+  data: ReservationByClientItem | null
   errors: any
-  meta: any
+  meta: {
+    path: string
+    method: string
+    timestamp: string
+    statusCode: number
+  }
 }
 
-export async function getReservationsByClientDocumentPublicService(clientDocument: string) {
-  return apiFetch<BackendReservationsByClient>(
-    `/api/reservations/get-by-clients/${clientDocument}`,
+export async function getReservationByClientAndCodePublicService(
+  identificationNumber: string,
+  code: string,
+) {
+  return apiFetch<BackendReservationByClientAndCode>(
+    `/api/reservations/get-reservation-client/${identificationNumber}/reservation/${code}`,
     {
       method: "GET",
     },
