@@ -1,5 +1,3 @@
-//components/search-bar.tsx
-
 "use client"
 
 import { useState } from "react"
@@ -56,6 +54,7 @@ function GuestCounter({
 export function SearchBar() {
   const router = useRouter()
   const { setSearchParams } = useBooking()
+
   const [startDate, setStartDate] = useState<Date>()
   const [endDate, setEndDate] = useState<Date>()
   const [adults, setAdults] = useState(2)
@@ -65,13 +64,12 @@ export function SearchBar() {
 
   const [openStart, setOpenStart] = useState(false)
   const [openEnd, setOpenEnd] = useState(false)
+  const [openGuests, setOpenGuests] = useState(false)
 
   const handleSearch = () => {
     if (!startDate || !endDate) return
-  
-    // evita que salida sea igual o menor que llegada
     if (endDate <= startDate) return
-  
+
     const params = {
       startDate: format(startDate, "yyyy-MM-dd"),
       endDate: format(endDate, "yyyy-MM-dd"),
@@ -80,9 +78,9 @@ export function SearchBar() {
       babies,
       pets,
     }
-  
+
     setSearchParams(params)
-  
+
     const query = new URLSearchParams({
       start: params.startDate,
       end: params.endDate,
@@ -91,65 +89,97 @@ export function SearchBar() {
       babies: String(babies),
       pets: String(pets),
     })
-  
+
     router.push(`/search?${query.toString()}`)
   }
 
   const totalGuests = adults + kids + babies
 
+  const handleSelectStartDate = (date: Date | undefined) => {
+    if (!date) return
+
+    setStartDate(date)
+
+    if (endDate && endDate <= date) {
+      setEndDate(undefined)
+    }
+
+    setOpenStart(false)
+    setOpenEnd(true)
+    setOpenGuests(false)
+  }
+
+  const handleSelectEndDate = (date: Date | undefined) => {
+    if (!date) return
+
+    setEndDate(date)
+    setOpenEnd(false)
+    setOpenGuests(true)
+  }
+
   return (
-    <div id="search" className="mx-auto -mt-20 relative z-10 max-w-5xl px-4">
+    <div id="search" className="relative z-10 mx-auto -mt-20 max-w-5xl px-4">
       <div className="glass rounded-2xl p-4 shadow-2xl md:p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end">
-          {/* Check-in */}
+          {/* Llegada */}
           <div className="flex-1">
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Llegada
             </label>
-            <Popover>
+            <Popover open={openStart} onOpenChange={setOpenStart}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   className="flex w-full items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm transition-colors hover:border-accent"
                 >
                   <CalendarDays className="h-4 w-4 text-accent" />
-                  <span className={startDate ? "text-foreground font-medium" : "text-muted-foreground"}>
-                    {startDate ? format(startDate, "dd MMM yyyy", { locale: es }) : "Seleccionar fecha"}
+                  <span className={startDate ? "font-medium text-foreground" : "text-muted-foreground"}>
+                    {startDate
+                      ? format(startDate, "dd MMM yyyy", { locale: es })
+                      : "Seleccionar fecha"}
                   </span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                locale={es}
-                mode="single"
-                selected={startDate}
-                onSelect={(date) => {
-                  setStartDate(date)
-                  if (date && endDate && endDate <= date) {
-                    setEndDate(undefined)
-                  }
-                }}
-                disabled={(date) => date < new Date()}
-                initialFocus
-              />
+                <Calendar
+                  locale={es}
+                  mode="single"
+                  selected={startDate}
+                  onSelect={handleSelectStartDate}
+                  disabled={(date) => {
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    return date < today
+                  }}
+                  initialFocus
+                />
               </PopoverContent>
             </Popover>
           </div>
 
-          {/* Check-out */}
+          {/* Salida */}
           <div className="flex-1">
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Salida
             </label>
-            <Popover>
+            <Popover
+              open={openEnd}
+              onOpenChange={(open) => {
+                if (!startDate && open) return
+                setOpenEnd(open)
+              }}
+            >
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm transition-colors hover:border-accent"
+                  disabled={!startDate}
+                  className="flex w-full items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm transition-colors hover:border-accent disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <CalendarDays className="h-4 w-4 text-accent" />
-                  <span className={endDate ? "text-foreground font-medium" : "text-muted-foreground"}>
-                    {endDate ? format(endDate, "dd MMM yyyy", { locale: es }) : "Seleccionar fecha"}
+                  <span className={endDate ? "font-medium text-foreground" : "text-muted-foreground"}>
+                    {endDate
+                      ? format(endDate, "dd MMM yyyy", { locale: es })
+                      : "Seleccionar fecha"}
                   </span>
                 </button>
               </PopoverTrigger>
@@ -158,28 +188,32 @@ export function SearchBar() {
                   locale={es}
                   mode="single"
                   selected={endDate}
-                  onSelect={setEndDate}
-                  disabled={(date) => date < (startDate || new Date())}
+                  onSelect={handleSelectEndDate}
+                  disabled={(date) => {
+                    const minDate = startDate ?? new Date()
+                    return date <= minDate
+                  }}
                   initialFocus
                 />
               </PopoverContent>
             </Popover>
           </div>
 
-          {/* Guests */}
+          {/* Huéspedes */}
           <div className="flex-1">
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Huespedes
+              Huéspedes
             </label>
-            <Popover>
+            <Popover open={openGuests} onOpenChange={setOpenGuests}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm transition-colors hover:border-accent"
+                  disabled={!startDate || !endDate}
+                  className="flex w-full items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm transition-colors hover:border-accent disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Users className="h-4 w-4 text-accent" />
                   <span className="font-medium text-foreground">
-                    {totalGuests} {totalGuests === 1 ? "huesped" : "huespedes"}
+                    {totalGuests} {totalGuests === 1 ? "huésped" : "huéspedes"}
                     {pets > 0 ? `, ${pets} mascota${pets > 1 ? "s" : ""}` : ""}
                   </span>
                 </button>
@@ -187,19 +221,29 @@ export function SearchBar() {
               <PopoverContent className="w-72" align="start">
                 <div className="space-y-1">
                   <GuestCounter label="Adultos" value={adults} onChange={setAdults} min={1} max={10} />
-                  <GuestCounter label="Ninos" value={kids} onChange={setKids} />
-                  <GuestCounter label="Bebes" value={babies} onChange={setBabies} />
+                  <GuestCounter label="Niños" value={kids} onChange={setKids} />
+                  <GuestCounter label="Bebés" value={babies} onChange={setBabies} />
                   <GuestCounter label="Mascotas" value={pets} onChange={setPets} max={3} />
+
+                  <div className="pt-3">
+                    <Button
+                      type="button"
+                      className="w-full rounded-xl bg-accent text-accent-foreground hover:bg-accent/90"
+                      onClick={() => setOpenGuests(false)}
+                    >
+                      Confirmar huéspedes
+                    </Button>
+                  </div>
                 </div>
               </PopoverContent>
             </Popover>
           </div>
 
-          {/* Search Button */}
+          {/* Buscar */}
           <Button
             onClick={handleSearch}
             disabled={!startDate || !endDate}
-            className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl px-8 py-3 text-sm font-semibold h-auto md:py-3"
+            className="h-auto rounded-xl bg-accent px-8 py-3 text-sm font-semibold text-accent-foreground hover:bg-accent/90 md:py-3"
           >
             <Search className="mr-2 h-4 w-4" />
             Buscar

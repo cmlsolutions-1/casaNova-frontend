@@ -2,11 +2,32 @@
 "use client";
 
 import Link from "next/link";
-import { listRoomsPublicService, type BackendRoom } from "@/services/room.service"
+import { listRoomsPublicService, type BackendRoom, type RoomType } from "@/services/room.service"
 import React, { useEffect, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Bed, Users, Eye } from "lucide-react";
+import { formatCurrencyCOP } from "@/utils/format"
+
+const ROOM_TYPE_ORDER: RoomType[] = [
+  "SIMPLE",
+  "DOUBLE",
+  "TRIPLE",
+  "QUADRUPLE",
+  "QUINTUPLE",
+  "SEXTUPLE",
+  "VIP",
+]
+
+const ROOM_TYPE_LABEL: Record<RoomType, string> = {
+  SIMPLE: "Simple",
+  DOUBLE: "Doble",
+  TRIPLE: "Triple",
+  QUADRUPLE: "Cuádruple",
+  QUINTUPLE: "Quíntuple",
+  SEXTUPLE: "Séxtuple",
+  VIP: "VIP",
+}
 
 export function RoomsPreview() {
   const [rooms, setRooms] = useState<BackendRoom[]>([])
@@ -14,6 +35,7 @@ export function RoomsPreview() {
 
   useEffect(() => {
     let alive = true
+
     ;(async () => {
       try {
         const data = await listRoomsPublicService()
@@ -29,7 +51,17 @@ export function RoomsPreview() {
     }
   }, [])
 
-  const featured = useMemo(() => rooms.slice(0, 3), [rooms])
+  const featured = useMemo(() => {
+    const roomByType = new Map<RoomType, BackendRoom>()
+
+    for (const room of rooms) {
+      if (!roomByType.has(room.type)) {
+        roomByType.set(room.type, room)
+      }
+    }
+
+    return ROOM_TYPE_ORDER.map((type) => roomByType.get(type)).filter(Boolean) as BackendRoom[]
+  }, [rooms])
 
   return (
     <section id="rooms" className="bg-secondary/50 py-20 px-4">
@@ -51,6 +83,12 @@ export function RoomsPreview() {
           <p className="text-center text-muted-foreground">Cargando habitaciones...</p>
         )}
 
+        {!loading && featured.length === 0 && (
+          <p className="text-center text-muted-foreground">
+            No hay habitaciones disponibles en este momento.
+          </p>
+        )}
+
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
           {featured.map((room) => {
             const img = room.images?.[0]?.url || "/placeholder.svg"
@@ -66,14 +104,16 @@ export function RoomsPreview() {
                 </div>
 
                 <div className="p-5">
-                  <div className="mb-2 flex items-center justify-between">
-                    <Badge variant="secondary" className="capitalize text-xs">
-                      {room.type}
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {ROOM_TYPE_LABEL[room.type]}
                     </Badge>
 
-                    <span className="text-xl font-bold text-foreground">
-                      ${room.price}
-                      <span className="text-sm font-normal text-muted-foreground">/x pers. noche</span>
+                    <span className="text-lg font-bold text-foreground">
+                      {formatCurrencyCOP(room.price)}
+                      <span className="ml-1 text-sm font-normal text-muted-foreground">
+                        / noche
+                      </span>
                     </span>
                   </div>
 
@@ -93,7 +133,7 @@ export function RoomsPreview() {
 
                     <span className="flex items-center gap-1">
                       <Bed className="h-4 w-4" />
-                      {room.singleBeds + room.doubleBeds} camas
+                      {room.singleBeds + room.doubleBeds + room.cabin + room.extraDouble} camas
                     </span>
                   </div>
 
