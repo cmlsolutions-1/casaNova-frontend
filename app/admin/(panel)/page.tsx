@@ -1,4 +1,4 @@
-// app/admin/(panel)/page.tsx
+//app/admin/(panel)/page.tsx
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
@@ -9,15 +9,26 @@ import { Badge } from "@/components/ui/badge"
 import { BedDouble, CalendarCheck, DollarSign, Users, Clock } from "lucide-react"
 
 import { listServicesService, type BackendService } from "@/services/service.service"
+import {
+  listReservationsService,
+  type ReservationListItem,
+} from "@/services/reservation.service"
+import { formatCurrencyCOP } from "@/utils/format"
+import { formatDateSpanish } from "@/utils/date"
 
 export default function AdminDashboard() {
-  const { rooms, reservations, payments, adminAuth } = useBooking()
+  const { rooms, adminAuth } = useBooking()
 
   const [services, setServices] = useState<BackendService[]>([])
   const [servicesError, setServicesError] = useState<string | null>(null)
 
+  const [reservations, setReservations] = useState<ReservationListItem[]>([])
+  const [reservationsError, setReservationsError] = useState<string | null>(null)
+  const [loadingReservations, setLoadingReservations] = useState(false)
+
   useEffect(() => {
     let alive = true
+
     ;(async () => {
       try {
         const data = await listServicesService()
@@ -29,43 +40,108 @@ export default function AdminDashboard() {
         setServices([])
       }
     })()
+
     return () => {
       alive = false
     }
   }, [])
 
-  const totalRevenue = payments.filter((p) => p.status === "paid").reduce((s, p) => s + p.amount, 0)
+  useEffect(() => {
+    let alive = true
+
+    ;(async () => {
+      try {
+        setLoadingReservations(true)
+        setReservationsError(null)
+
+        const res = await listReservationsService()
+
+        if (!res?.ok || !Array.isArray(res?.data?.data)) {
+          throw new Error("No se pudieron cargar las reservas")
+        }
+
+        setReservations(res.data.data)
+        
+      } catch (e: any) {
+        if (!alive) return
+        setReservationsError(e?.message ?? "Error cargando reservas")
+        setReservations([])
+      } finally {
+        if (!alive) return
+        setLoadingReservations(false)
+      }
+    })()
+
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const totalRevenue = reservations
+    .filter((r) => r.status === "APPROVED" || r.status === "CONFIRMED")
+    .reduce((sum, r) => sum + Number(r.totalValue || 0), 0)
+
   const pendingCount = reservations.filter((r) => r.status === "PAID_PENDING_APPROVAL").length
-  const approvedCount = reservations.filter((r) => r.status === "APPROVED").length
+  const approvedCount = reservations.filter(
+    (r) => r.status === "APPROVED" || r.status === "CONFIRMED"
+  ).length
 
-  // Ajusta esto a TU backend real de rooms
-  // Si tu backend usa "ACTIVE/INACTIVE" no "available", cámbialo:
   const availableRooms = rooms.filter((r: any) => r.status === "ACTIVE").length
-
   const activeServices = services.filter((s) => s.status === "ACTIVE").length
 
   const stats = [
-    { label: "Ingresos Totales", value: `$${totalRevenue.toLocaleString()}`, icon: DollarSign, color: "text-green-600" },
-    { label: "Reservas Pendientes", value: pendingCount, icon: Clock, color: "text-amber-600" },
-    { label: "Reservas Aprobadas", value: approvedCount, icon: CalendarCheck, color: "text-blue-600" },
-    { label: "Habitaciones Disponibles", value: `${availableRooms}/${rooms.length}`, icon: BedDouble, color: "text-purple-600" },
-    { label: "Servicios Activos", value: activeServices, icon: Users, color: "text-teal-600" },
+    {
+      label: "Ingresos Totales",
+      value: formatCurrencyCOP(totalRevenue),
+      icon: DollarSign,
+      color: "text-green-600",
+    },
+    {
+      label: "Reservas Pendientes",
+      value: pendingCount,
+      icon: Clock,
+      color: "text-amber-600",
+    },
+    {
+      label: "Reservas Aprobadas",
+      value: approvedCount,
+      icon: CalendarCheck,
+      color: "text-blue-600",
+    },
+    {
+      label: "Habitaciones Disponibles",
+      value: `${availableRooms}/${rooms.length}`,
+      icon: BedDouble,
+      color: "text-purple-600",
+    },
+    {
+      label: "Servicios Activos",
+      value: activeServices,
+      icon: Users,
+      color: "text-teal-600",
+    },
   ]
 
-  const recentReservations = useMemo(
-    () => [...reservations].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5),
-    [reservations],
-  )
+  const recentReservations = useMemo(() => {
+    return [...reservations]
+      .sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.startDate).getTime()
+        const dateB = new Date(b.createdAt || b.startDate).getTime()
+        return dateB - dateA
+      })
+      .slice(0, 5)
+  }, [reservations])
 
   const statusLabels: Record<string, string> = {
     PENDING: "Pendiente",
     PAID_PENDING_APPROVAL: "Pago pendiente aprobación",
     APPROVED: "Aprobada",
+    CONFIRMED: "Confirmada",
     REJECTED: "Rechazada",
   }
 
   const statusVariant = (s: string) => {
-    if (s === "APPROVED") return "default" as const
+    if (s === "APPROVED" || s === "CONFIRMED") return "default" as const
     if (s === "REJECTED") return "destructive" as const
     return "secondary" as const
   }
@@ -76,9 +152,12 @@ export default function AdminDashboard() {
         <h1 className="font-serif text-3xl font-bold text-foreground">Dashboard</h1>
         <p className="text-muted-foreground">
           Bienvenido, {adminAuth.user?.name}.{" "}
-          {adminAuth.user?.role === "EMPLOYEE" ? "Vista de empleado (solo lectura)." : "Panel de administración."}
+          {adminAuth.user?.role === "EMPLOYEE"
+            ? "Vista de empleado (solo lectura)."
+            : "Panel de administración."}
         </p>
         {servicesError && <p className="mt-2 text-sm text-red-500">{servicesError}</p>}
+        {reservationsError && <p className="mt-2 text-sm text-red-500">{reservationsError}</p>}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -102,14 +181,16 @@ export default function AdminDashboard() {
           <CardTitle className="font-serif text-foreground">Reservas Recientes</CardTitle>
         </CardHeader>
         <CardContent>
-          {recentReservations.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No hay reservas registradas.</p>
+          {loadingReservations ? (
+            <p className="py-8 text-center text-muted-foreground">Cargando reservas...</p>
+          ) : recentReservations.length === 0 ? (
+            <p className="py-8 text-center text-muted-foreground">No hay reservas registradas.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="pb-3 pr-4 font-medium">ID</th>
+                    <th className="pb-3 pr-4 font-medium">Código</th>
                     <th className="pb-3 pr-4 font-medium">Huésped</th>
                     <th className="pb-3 pr-4 font-medium">Fechas</th>
                     <th className="pb-3 pr-4 font-medium">Total</th>
@@ -118,20 +199,28 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody>
                   {recentReservations.map((res) => {
-                    const room = rooms.find((r: any) => r.id === res.roomId)
+                    const roomNames =
+                      res.rooms?.map((room) => room.nameRoom).join(", ") || "Sin habitación"
+
                     return (
                       <tr key={res.id} className="border-b border-border/50 last:border-0">
-                        <td className="py-3 pr-4 font-mono text-xs text-foreground">{res.id}</td>
+                        <td className="py-3 pr-4 font-mono text-xs text-foreground">
+                          {res.reservationCode || res.id}
+                        </td>
                         <td className="py-3 pr-4">
                           <div>
-                            <p className="font-medium text-foreground">{res.guestInfo.name}</p>
-                            <p className="text-xs text-muted-foreground">{room?.nameRoom ?? res.roomId}</p>
+                            <p className="font-medium text-foreground">
+                              {res.client?.fullName || res.client?.documentNumber || "Sin nombre"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{roomNames}</p>
                           </div>
                         </td>
                         <td className="py-3 pr-4 text-muted-foreground">
-                          {res.startDate} - {res.endDate}
+                          {formatDateSpanish(res.startDate)} - {formatDateSpanish(res.endDate)}
                         </td>
-                        <td className="py-3 pr-4 font-medium text-foreground">${res.totalPrice.toLocaleString()}</td>
+                        <td className="py-3 pr-4 font-medium text-foreground">
+                          {formatCurrencyCOP(res.totalValue)}
+                        </td>
                         <td className="py-3">
                           <Badge variant={statusVariant(res.status)}>
                             {statusLabels[res.status] || res.status}
