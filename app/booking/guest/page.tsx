@@ -1,3 +1,5 @@
+//app/booking/guest/page.tsx
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -25,13 +27,15 @@ export default function BookingGuestPage() {
   })
 
   const [errors, setErrors] = useState<Partial<Record<keyof GuestInfo, string>>>({})
+  const hasRooms = booking.selectedRooms && booking.selectedRooms.length > 0
+  const hasExtraBooking = !!booking.extraBooking
 
   useEffect(() => {
-    // ✅ no validar hasta que el context esté hidratado
+    // no validar hasta que el context esté hidratado
     if (!hydrated) return
 
-    // ✅ ahora la validación es por selectedRooms
-    if (!booking.selectedRooms || booking.selectedRooms.length === 0) {
+    // ahora la validación es por selectedRooms
+    if (!hasRooms && !hasExtraBooking) {
       router.push("/")
       return
     }
@@ -65,7 +69,7 @@ export default function BookingGuestPage() {
     if (!validate()) return
     setGuestInfo(form)
 
-    // ✅ para evitar carreras de estado, navega en el siguiente tick
+    // para evitar carreras de estado, navega en el siguiente tick
     setTimeout(() => router.push("/booking/confirm"), 0)
   }
 
@@ -186,7 +190,17 @@ export default function BookingGuestPage() {
       </div>
 
       <div className="mt-8 flex justify-between">
-        <Button variant="outline" onClick={() => router.push("/booking/services")} className="rounded-xl px-6">
+        <Button
+            variant="outline"
+            onClick={() => {
+              if (booking.extraBooking) {
+                router.push(`/booking/extra-service/${booking.extraBooking.type}`)
+                return
+              }
+              router.push("/booking/services")
+            }}
+            className="rounded-xl px-6"
+          >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Atrás
         </Button>

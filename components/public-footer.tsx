@@ -1,5 +1,6 @@
 import { Hotel, Phone, Mail, MapPin } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 
 export function PublicFooter() {
   return (
@@ -8,7 +9,14 @@ export function PublicFooter() {
         <div className="grid gap-12 md:grid-cols-3">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <Hotel className="h-6 w-6 text-accent" />
+              <Image
+                            src="/LOGO.png"
+                            alt="Logo del hotel"
+                            width={56}
+                            height={56}
+                            className="h-auto w-auto object-contain"
+                            priority
+                          />
               <span className="font-serif text-xl font-bold">Casa Nova</span>
             </div>
             <p className="text-sm leading-relaxed text-primary-foreground/70">

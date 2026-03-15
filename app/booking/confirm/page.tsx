@@ -19,10 +19,13 @@ import { upsertClientPublicService } from "@/services/client.service"
 import { createReservationPublicService } from "@/services/reservation.service"
 import { createPaymentPublicService } from "@/services/payment.service"
 
+import { EXTRA_BOOKING_OPTIONS } from "@/lib/day-services"
+import { formatCurrencyCOP } from "@/utils/format"
+
 export default function BookingConfirmPage() {
   const router = useRouter()
   const { booking, setBookingConsents } = useBooking()
-  const { searchParams: sp, selectedRooms, selectedServices, guestInfo } = booking
+  const { searchParams: sp, selectedRooms, selectedServices, guestInfo, extraBooking } = booking
 
   const acceptedTerms = booking.consents?.acceptedTerms ?? false
   const acceptedMinorsPolicy = booking.consents?.acceptedMinorsPolicy ?? false
@@ -32,10 +35,13 @@ export default function BookingConfirmPage() {
 
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
+
+  const isExtraBooking = !!extraBooking
+  const extraConfig = extraBooking ? EXTRA_BOOKING_OPTIONS[extraBooking.type] : null
   
 
   const handleGoToMercadoPago = async () => {
-  if (!sp || !guestInfo || !selectedRooms || selectedRooms.length === 0) return
+  if (!guestInfo) return
 
   setPaying(true)
   setPayError(null)
@@ -56,7 +62,25 @@ export default function BookingConfirmPage() {
       throw new Error(clientRes?.message || "No se pudo crear/actualizar el cliente")
     }
 
-    // 2) crear reserva
+    // 2) flujo temporal mock para pasadía / salón
+    if (isExtraBooking && extraBooking) {
+      console.log("MOCK EXTRA BOOKING =>", {
+        extraBooking,
+        guestInfo,
+      })
+
+      setTimeout(() => {
+        router.push("/booking/success?id=mock-extra-booking")
+      }, 800)
+
+      return
+    }
+
+    // 3) flujo normal de habitaciones
+    if (!sp || !selectedRooms || selectedRooms.length === 0) {
+      throw new Error("No hay habitaciones seleccionadas")
+    }
+
     const startISO = new Date(sp.startDate).toISOString()
     const endISO = new Date(sp.endDate).toISOString()
 
@@ -109,7 +133,6 @@ export default function BookingConfirmPage() {
         remainingPets -= petsHere
       }
 
-      // solo agrega habitaciones realmente ocupadas
       if (used > 0) {
         if (roomEntry.numberOfPeople === undefined) {
           roomEntry.numberOfPeople = 0
@@ -118,7 +141,6 @@ export default function BookingConfirmPage() {
       }
     }
 
-    // validación extra
     if (
       remainingAdults > 0 ||
       remainingKids > 0 ||
@@ -130,25 +152,25 @@ export default function BookingConfirmPage() {
       )
     }
 
-  const servicesPayload =
-  (selectedServices ?? []).length > 0
-    ? (selectedServices ?? []).map((s: any) => ({
-        serviceId: s.serviceId,
-        amount: s.amount,
-      }))
-    : undefined
+    const servicesPayload =
+      (selectedServices ?? []).length > 0
+        ? (selectedServices ?? []).map((s: any) => ({
+            serviceId: s.serviceId,
+            amount: s.amount,
+          }))
+        : undefined
 
-  const reservationBody = {
-    startDate: startISO,
-    endDate: endISO,
-    clientDocument: guestInfo.documentNumber,
-    rooms: roomsPayload,
-    ...(servicesPayload ? { services: servicesPayload } : {}),
-  }
+    const reservationBody = {
+      startDate: startISO,
+      endDate: endISO,
+      clientDocument: guestInfo.documentNumber,
+      rooms: roomsPayload,
+      ...(servicesPayload ? { services: servicesPayload } : {}),
+    }
 
-  console.log("BODY RESERVATION =>", reservationBody)
+    console.log("BODY RESERVATION =>", reservationBody)
 
-  const reservationRes = await createReservationPublicService(reservationBody)
+    const reservationRes = await createReservationPublicService(reservationBody)
 
     if (!reservationRes?.ok) {
       throw new Error(reservationRes?.message || "No se pudo crear la reserva")
@@ -159,7 +181,6 @@ export default function BookingConfirmPage() {
       throw new Error("El backend no devolvió id de reserva")
     }
 
-    // 3) crear pago mercado pago
     const paymentRes = await createPaymentPublicService({
       reservationId,
     })
@@ -175,7 +196,6 @@ export default function BookingConfirmPage() {
       throw new Error("No se recibió el link de pago de Mercado Pago")
     }
 
-    // 4) redirigir a mercado pago
     window.location.href = checkoutUrl
   } catch (e: any) {
     console.error("Error en proceso de pago:", e)
@@ -185,10 +205,15 @@ export default function BookingConfirmPage() {
 }
 
   useEffect(() => {
-    if (!sp || !guestInfo || !selectedRooms || selectedRooms.length === 0) {
-      router.push("/")
-      return
-    }
+    const hasRooms = !!selectedRooms && selectedRooms.length > 0
+    const hasExtraBooking = !!extraBooking
+
+    if ((!sp && !hasExtraBooking) || !guestInfo || (!hasRooms && !hasExtraBooking)) {
+    router.push("/")
+    return
+  }
+
+  
 
     let alive = true
     ;(async () => {
@@ -205,7 +230,7 @@ export default function BookingConfirmPage() {
     return () => {
       alive = false
     }
-  }, [sp, guestInfo, selectedRooms, router])
+  }, [sp, guestInfo, selectedRooms, extraBooking, router])
 
   const nights = useMemo(() => {
     if (!sp) return 0
@@ -214,52 +239,77 @@ export default function BookingConfirmPage() {
     return Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
   }, [sp])
 
-  if (!sp || !guestInfo || !selectedRooms || selectedRooms.length === 0) return null
+  const hasRooms = !!selectedRooms && selectedRooms.length > 0
+  const hasExtraBooking = !!extraBooking
 
-  const prettyRange = (() => {
+  if ((!sp && !hasExtraBooking) || !guestInfo || (!hasRooms && !hasExtraBooking)) {
+    return null
+  }
+
+  const roomSearchParams = sp
+
+    const prettyRange = (() => {
     try {
-      return `${format(parseISO(sp.startDate), "dd MMM yyyy", { locale: es })} - ${format(parseISO(sp.endDate), "dd MMM yyyy", { locale: es })}`
+      if (isExtraBooking && extraBooking?.date) {
+        return format(parseISO(extraBooking.date), "dd MMM yyyy", { locale: es })
+      }
+
+      if (sp) {
+        return `${format(parseISO(sp.startDate), "dd MMM yyyy", { locale: es })} - ${format(parseISO(sp.endDate), "dd MMM yyyy", { locale: es })}`
+      }
+
+      return ""
     } catch {
-      return `${sp.startDate} - ${sp.endDate}`
+      if (isExtraBooking && extraBooking?.date) return extraBooking.date
+      if (sp) return `${sp.startDate} - ${sp.endDate}`
+      return ""
     }
   })()
 
-  const roomsPerNight = selectedRooms.reduce((sum: number, r: any) => {
-  const selectedPeople = Number(r.selectedPeople ?? 1)
-  const selectedPricePerNight =
-    r.selectedPricePerNight ?? Number(r.price ?? 0) * selectedPeople
+  const roomsPerNight = isExtraBooking
+    ? 0
+    : selectedRooms.reduce((sum: number, r: any) => {
+        const selectedPeople = Number(r.selectedPeople ?? 1)
+        const selectedPricePerNight =
+          r.selectedPricePerNight ?? Number(r.price ?? 0) * selectedPeople
 
-    return sum + Number(selectedPricePerNight)
-  }, 0)
+        return sum + Number(selectedPricePerNight)
+      }, 0)
 
-  const roomsTotal = roomsPerNight * nights
+  const roomsTotal = isExtraBooking ? 0 : roomsPerNight * nights
 
-  const svcDetails = (selectedServices ?? []).map((s) => {
-    const svc = servicesFromApi.find((sv) => sv.id === s.serviceId)
-    return {
-      id: s.serviceId,
-      name: svc?.name ?? "Servicio",
-      unitPrice: svc?.price ?? 0,
-      amount: s.amount,
-      total: (svc?.price ?? 0) * s.amount,
-    }
-  })
+  const svcDetails = isExtraBooking
+  ? []
+  : (selectedServices ?? []).map((s) => {
+      const svc = servicesFromApi.find((sv) => sv.id === s.serviceId)
+      return {
+        id: s.serviceId,
+        name: svc?.name ?? "Servicio",
+        unitPrice: svc?.price ?? 0,
+        amount: s.amount,
+        total: (svc?.price ?? 0) * s.amount,
+      }
+    })
 
   const svcTotal = svcDetails.reduce((sum, s) => sum + s.total, 0)
-  const grandTotal = roomsTotal + svcTotal
 
-  const totalPeople = sp.adults + sp.kids + sp.babies
-  const capacityTotal = selectedRooms.reduce((sum: number, r: any) => sum + (r.capacity ?? 0), 0)
+  const grandTotal = isExtraBooking ? Number(extraBooking?.totalPrice ?? 0) : roomsTotal + svcTotal
+
+  const totalPeople = sp ? sp.adults + sp.kids + sp.babies : 0
+  const capacityTotal = selectedRooms.reduce(
+    (sum: number, r: any) => sum + (r.capacity ?? 0),
+    0
+  )
 
   const canProceedToPay = acceptedTerms && acceptedMinorsPolicy && !paying
 
   return (
     <div>
-      <h1 className="font-serif text-2xl font-bold text-foreground md:text-3xl mb-2">
-        Confirmar Reserva
+      <h1 className="mb-2 font-serif text-2xl font-bold text-foreground md:text-3xl">
+        Confirmar reserva
       </h1>
-      <p className="text-muted-foreground mb-8">
-        Revise los detalles de su reserva antes de proceder al pago.
+      <p className="mb-8 text-muted-foreground">
+        Revise los detalles antes de proceder al pago.
       </p>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -273,33 +323,98 @@ export default function BookingConfirmPage() {
               <div className="flex items-center gap-3">
                 <CalendarDays className="h-5 w-5 text-accent" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Estancia</p>
-                  <p className="text-sm font-bold">{prettyRange}</p>
                   <p className="text-xs text-muted-foreground">
-                    {nights} noche{nights > 1 ? "s" : ""}
+                    {isExtraBooking ? "Fecha del servicio" : "Estancia"}
                   </p>
+                  <p className="text-sm font-bold">{prettyRange}</p>
+                  {!isExtraBooking && (
+                    <p className="text-xs text-muted-foreground">
+                      {nights} noche{nights > 1 ? "s" : ""}
+                    </p>
+                  )}
+                  {isExtraBooking && extraConfig?.schedule && (
+                    <p className="text-xs text-muted-foreground">{extraConfig.schedule}</p>
+                  )}
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
                 <Users className="h-5 w-5 text-accent" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Huéspedes</p>
-                  <p className="text-sm font-bold">
-                    {sp.adults} adulto{sp.adults > 1 ? "s" : ""}
-                    {sp.kids > 0 ? `, ${sp.kids} niño${sp.kids > 1 ? "s" : ""}` : ""}
-                    {sp.babies > 0 ? `, ${sp.babies} bebé${sp.babies > 1 ? "s" : ""}` : ""}
-                    {sp.pets > 0 ? `, ${sp.pets} mascota${sp.pets > 1 ? "s" : ""}` : ""}
-                  </p>
                   <p className="text-xs text-muted-foreground">
-                    Capacidad seleccionada: {capacityTotal} (para {totalPeople})
+                    {isExtraBooking ? "Asistentes" : "Huéspedes"}
                   </p>
+
+                  {isExtraBooking ? (
+                    <p className="text-sm font-bold">
+                      {extraBooking?.people} persona{Number(extraBooking?.people) === 1 ? "" : "s"}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-sm font-bold">
+                        {sp?.adults} adulto{sp?.adults && sp.adults > 1 ? "s" : ""}
+                        {sp?.kids ? `, ${sp.kids} niño${sp.kids > 1 ? "s" : ""}` : ""}
+                        {sp?.babies ? `, ${sp.babies} bebé${sp.babies > 1 ? "s" : ""}` : ""}
+                        {sp?.pets ? `, ${sp.pets} mascota${sp.pets > 1 ? "s" : ""}` : ""}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Capacidad seleccionada: {capacityTotal} (para {totalPeople})
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
+          {isExtraBooking && extraBooking && extraConfig && (
+            <div className="rounded-2xl bg-card p-5 shadow">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  Servicio seleccionado
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/booking/extra-service/${extraBooking.type}`)}
+                  className="flex items-center gap-1 text-xs text-accent hover:underline"
+                >
+                  <Pencil className="h-3 w-3" /> Cambiar
+                </button>
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <p className="font-bold text-card-foreground">{extraConfig.title}</p>
+                <p className="text-muted-foreground">{extraConfig.description}</p>
+
+                <p>
+                  <span className="text-muted-foreground">Fecha:</span>{" "}
+                  <span className="font-medium text-foreground">{prettyRange}</span>
+                </p>
+
+                <p>
+                  <span className="text-muted-foreground">Personas:</span>{" "}
+                  <span className="font-medium text-foreground">{extraBooking.people}</span>
+                </p>
+
+                {extraConfig.schedule && (
+                  <p>
+                    <span className="text-muted-foreground">Horario:</span>{" "}
+                    <span className="font-medium text-foreground">{extraConfig.schedule}</span>
+                  </p>
+                )}
+
+                <p>
+                  <span className="text-muted-foreground">Total:</span>{" "}
+                  <span className="font-bold text-accent">
+                    {formatCurrencyCOP(extraBooking.totalPrice)}
+                  </span>
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Rooms */}
+          {!isExtraBooking && (
           <div className="rounded-2xl bg-card p-5 shadow">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
@@ -307,11 +422,13 @@ export default function BookingConfirmPage() {
               </h2>
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  if (!roomSearchParams) return
+
                   router.push(
-                    `/search?start=${sp.startDate}&end=${sp.endDate}&adults=${sp.adults}&kids=${sp.kids}&babies=${sp.babies}&pets=${sp.pets}`,
+                    `/search?start=${roomSearchParams.startDate}&end=${roomSearchParams.endDate}&adults=${roomSearchParams.adults}&kids=${roomSearchParams.kids}&babies=${roomSearchParams.babies}&pets=${roomSearchParams.pets}`,
                   )
-                }
+                }}
                 className="flex items-center gap-1 text-xs text-accent hover:underline"
               >
                 <Pencil className="h-3 w-3" /> Cambiar
@@ -351,9 +468,10 @@ export default function BookingConfirmPage() {
               <span className="text-accent">${roomsTotal}</span>
             </p>
           </div>
+          )}
 
           {/* Services */}
-          {(selectedServices?.length ?? 0) > 0 && (
+          {!isExtraBooking && (selectedServices?.length ?? 0) > 0 && (
             <div className="rounded-2xl bg-card p-5 shadow">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
@@ -389,7 +507,7 @@ export default function BookingConfirmPage() {
           <div className="rounded-2xl bg-card p-5 shadow">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Datos del Huésped
+                Datos del Cliente
               </h2>
               <button
                 type="button"
@@ -432,27 +550,36 @@ export default function BookingConfirmPage() {
             </h2>
 
             <div className="space-y-3 text-sm">
+            {isExtraBooking ? (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{extraConfig?.title}</span>
+                <span className="font-bold">{formatCurrencyCOP(grandTotal)}</span>
+              </div>
+            ) : (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
                   Habitaciones ({nights} noche{nights > 1 ? "s" : ""})
                 </span>
-                <span className="font-bold">${roomsTotal}</span>
+                <span className="font-bold">{formatCurrencyCOP(roomsTotal)}</span>
               </div>
+            )}
 
-              {svcTotal > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Servicios</span>
-                  <span className="font-bold">${svcTotal}</span>
-                </div>
-              )}
-
-              <Separator />
-
-              <div className="flex justify-between text-base">
-                <span className="font-bold">Total</span>
-                <span className="text-xl font-bold text-accent">${grandTotal}</span>
+            {!isExtraBooking && svcTotal > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Servicios</span>
+                <span className="font-bold">{formatCurrencyCOP(svcTotal)}</span>
               </div>
+            )}
+
+            <Separator />
+
+            <div className="flex justify-between text-base">
+              <span className="font-bold">Total</span>
+              <span className="text-xl font-bold text-accent">
+                {formatCurrencyCOP(grandTotal)}
+              </span>
             </div>
+          </div>
 
             {payError && (
               <p className="mt-4 text-sm text-red-500">{payError}</p>

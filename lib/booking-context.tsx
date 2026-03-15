@@ -14,6 +14,9 @@ import { decodeJwt } from "@/lib/jwt"
 import type { BackendRoom } from "@/services/room.service"
 import type { BackendService } from "@/services/service.service"
 
+//datos quemados por el momento
+import type { ExtraBookingType } from "@/lib/day-services"
+
 interface SearchParams {
   startDate: string
   endDate: string
@@ -29,6 +32,7 @@ interface BookingState {
   selectedServices: SelectedService[]
   guestInfo: GuestInfo | null
   consents: BookingConsents
+  extraBooking: ExtraBookingSelection | null
 }
 
 interface AdminAuth {
@@ -39,6 +43,13 @@ interface AdminAuth {
 interface BookingConsents {
   acceptedTerms: boolean
   acceptedMinorsPolicy: boolean
+}
+
+interface ExtraBookingSelection {
+  type: ExtraBookingType
+  date: string
+  people: number
+  totalPrice: number
 }
 
 interface BookingContextType {
@@ -74,6 +85,9 @@ interface BookingContextType {
 
   setBookingConsents: (consents: Partial<BookingConsents>) => void
   resetBookingConsents: () => void
+
+  setExtraBooking: (data: ExtraBookingSelection) => void
+  clearExtraBooking: () => void
 }
 
 const BookingContext = createContext<BookingContextType | null>(null)
@@ -113,6 +127,7 @@ function normalizeBooking(raw: any): BookingState {
       acceptedTerms: false,
       acceptedMinorsPolicy: false,
     },
+    extraBooking: raw.extraBooking ?? null,
   }
 
   if (!raw || typeof raw !== "object") return base
@@ -132,6 +147,7 @@ function normalizeBooking(raw: any): BookingState {
       acceptedTerms: !!raw.consents?.acceptedTerms,
       acceptedMinorsPolicy: !!raw.consents?.acceptedMinorsPolicy,
     },
+    extraBooking: raw.extraBooking ?? null,
   }
 }
 
@@ -144,6 +160,7 @@ const defaultBooking: BookingState = {
     acceptedTerms: false,
     acceptedMinorsPolicy: false,
   },
+  extraBooking: null,
 }
 
 export function BookingProvider({ children }: { children: React.ReactNode }) {
@@ -364,6 +381,23 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     setBooking(defaultBooking)
   }, [])
 
+    const setExtraBooking = useCallback((data: ExtraBookingSelection) => {
+    setBooking((prev) => ({
+      ...prev,
+      searchParams: null,
+      selectedRooms: [],
+      selectedServices: [],
+      extraBooking: data,
+    }))
+  }, [])
+
+  const clearExtraBooking = useCallback(() => {
+    setBooking((prev) => ({
+      ...prev,
+      extraBooking: null,
+    }))
+  }, [])
+
   return (
     <BookingContext.Provider
       value={{
@@ -390,6 +424,8 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
         resetBooking,
         setBookingConsents,
         resetBookingConsents,
+        setExtraBooking,
+        clearExtraBooking,
       }}
     >
       {children}
