@@ -1,4 +1,3 @@
-// lib/api.ts
 import { authStorage } from "@/lib/auth-storage"
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
@@ -9,6 +8,11 @@ type ApiResponse<T> = {
   data: T
   errors: any
   meta?: any
+}
+
+type ApiFetchOptions = RequestInit & {
+  auth?: boolean
+  rawResponse?: boolean
 }
 
 function buildHeaders(
@@ -23,7 +27,7 @@ function buildHeaders(
   }
 
   const shouldUseNgrokHeader =
-  API_BASE.includes("ngrok-free.app") || API_BASE.includes("trycloudflare.com")
+    API_BASE.includes("ngrok-free.app") || API_BASE.includes("trycloudflare.com")
 
   if (shouldUseNgrokHeader && !h.has("ngrok-skip-browser-warning")) {
     h.set("ngrok-skip-browser-warning", "1")
@@ -38,16 +42,33 @@ function buildHeaders(
 
 async function safeJson(res: Response) {
   const ct = res.headers.get("content-type") || ""
+
   if (!ct.includes("application/json")) {
     const text = await res.text().catch(() => "")
     return { __nonJson: true, text }
   }
+
   return res.json().catch(() => ({ __badJson: true }))
+}
+
+function extractErrorMessage(json: any, status: number, url: string) {
+  if (!json) return `Error ${status} en ${url}`
+
+  if (Array.isArray(json?.errors) && json.errors.length > 0) {
+    const first = json.errors[0]
+    if (typeof first === "string") return first
+    if (first?.message) return first.message
+  }
+
+  if (typeof json?.errors === "string") return json.errors
+  if (json?.message) return json.message
+
+  return `Error ${status} en ${url}`
 }
 
 export async function apiFetch<T>(
   path: string,
-  init: RequestInit & { auth?: boolean } = {},
+  init: ApiFetchOptions = {},
 ): Promise<T> {
   if (!API_BASE) {
     throw new Error(
@@ -64,35 +85,83 @@ export async function apiFetch<T>(
   const isFormData =
     typeof FormData !== "undefined" && init.body instanceof FormData
 
-  // 1er intento
-  const res = await fetch(url, {
-    ...init,
-    headers: buildHeaders(init.headers, authHeaders, { isFormData }),
-  })
+  const doFetch = async (token?: string) => {
+    const headers = buildHeaders(
+      init.headers,
+      init.auth
+        ? {
+            Authorization: `Bearer ${token || access || ""}`,
+          }
+        : authHeaders,
+      { isFormData },
+    )
 
-  const json = (await safeJson(res)) as any
-
-  if (res.ok && json?.ok) return json.data as T
-
-  // refresh 1 vez (solo si 401 + auth)
-  if (res.status === 401 && init.auth) {
-    const refreshToken = authStorage.getRefresh()
-    if (!refreshToken) throw new Error("Sesión expirada")
-
-    const refreshRes = await fetch(`${API_BASE}/api/auth/refresh`, {
-      method: "POST",
-      headers: buildHeaders(undefined, undefined, { isFormData: false }),
-      body: JSON.stringify({ refreshToken }),
+    const response = await fetch(url, {
+      ...init,
+      headers,
     })
 
-    const refreshJson = (await safeJson(refreshRes)) as ApiResponse<{
-      accesToken: string
-      refreshToken: string
-    }> & any
+    const json = await safeJson(response)
+    return { response, json }
+  }
 
-    if (!refreshRes.ok || !refreshJson?.ok) {
+  let result: { response: Response; json: any }
+
+  try {
+    result = await doFetch()
+  } catch (error: any) {
+    throw new Error(
+      `No se pudo conectar con ${url}. Verifica backend, NEXT_PUBLIC_API_URL o CORS. Detalle: ${
+        error?.message || "Failed to fetch"
+      }`
+    )
+  }
+
+  const { response, json } = result
+
+  if (response.ok) {
+    // Si el backend responde envuelto con { ok, data, ... }
+    if (json?.ok !== undefined) {
+      return (init.rawResponse ? json : json.data) as T
+    }
+
+    // Si responde directamente un array u objeto
+    return json as T
+  }
+
+  if (response.status === 401 && init.auth) {
+    const refreshToken = authStorage.getRefresh()
+
+    if (!refreshToken) {
       authStorage.clear()
-      throw new Error(refreshJson?.message || "Sesión expirada")
+      throw new Error("Sesión expirada")
+    }
+
+    const refreshUrl = `${API_BASE}/api/auth/refresh`
+
+    let refreshResponse: Response
+    let refreshJson: any
+
+    try {
+      refreshResponse = await fetch(refreshUrl, {
+        method: "POST",
+        headers: buildHeaders(undefined, undefined, { isFormData: false }),
+        body: JSON.stringify({ refreshToken }),
+      })
+
+      refreshJson = await safeJson(refreshResponse)
+    } catch (error: any) {
+      authStorage.clear()
+      throw new Error(
+        `No se pudo refrescar la sesión. Detalle: ${error?.message || "Failed to fetch"}`
+      )
+    }
+
+    if (!refreshResponse.ok || !refreshJson?.ok) {
+      authStorage.clear()
+      throw new Error(
+        extractErrorMessage(refreshJson, refreshResponse.status, refreshUrl)
+      )
     }
 
     authStorage.setTokens(
@@ -100,29 +169,36 @@ export async function apiFetch<T>(
       refreshJson.data.refreshToken,
     )
 
-    // reintento
-    const retryIsFormData =
-      typeof FormData !== "undefined" && init.body instanceof FormData
+    let retryResult: { response: Response; json: any }
 
-    const retryRes = await fetch(url, {
-      ...init,
-      headers: buildHeaders(init.headers, {
-        Authorization: `Bearer ${refreshJson.data.accesToken}`,
-      }, { isFormData: retryIsFormData }),
-    })
+    try {
+      retryResult = await doFetch(refreshJson.data.accesToken)
+    } catch (error: any) {
+      throw new Error(
+        `No se pudo completar la solicitud después del refresh. Detalle: ${
+          error?.message || "Failed to fetch"
+        }`
+      )
+    }
 
-    const retryJson = (await safeJson(retryRes)) as any
+    if (!retryResult.response.ok) {
+      throw new Error(
+        extractErrorMessage(retryResult.json, retryResult.response.status, url)
+      )
+    }
 
-    if (retryRes.ok && retryJson?.ok) return retryJson.data as T
+    if (retryResult.json?.ok !== undefined) {
+      return (init.rawResponse ? retryResult.json : retryResult.json.data) as T
+    }
 
-    throw new Error(retryJson?.message || `Error ${retryRes.status} en ${url}`)
+    return retryResult.json as T
   }
 
   if (json?.__nonJson) {
     throw new Error(
-      `Respuesta no JSON (${res.status}) en ${url}: ${json.text?.slice(0, 200)}`,
+      `Respuesta no JSON (${response.status}) en ${url}: ${json.text?.slice(0, 200)}`
     )
   }
 
-  throw new Error(json?.message || `Error ${res.status} en ${url}`)
+  throw new Error(extractErrorMessage(json, response.status, url))
 }

@@ -1,34 +1,71 @@
+//components/services-otherday.tsx
+
 "use client"
 
 import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
 import { CalendarDays, PartyPopper, SunMedium, Clock, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatCurrencyCOP } from "@/utils/format"
+import {
+  listServicesPublicService,
+  type BackendService,
+} from "@/services/service.service"
 
-const options = [
-  {
-    id: "DAY_PASS",
-    title: "Pasadía",
-    description:
-      "Ideal para disfrutar un día especial con familia y amigos. Mínimo 20 personas.",
-    price: 500000,
-    extra: "Persona adicional: $25.000 COP",
+function getExtraServiceMeta(service: BackendService) {
+  const name = service.name.toLowerCase()
+
+  if (name.includes("salon") || name.includes("salón")) {
+    return {
+      kind: "EVENT_HALL" as const,
+      icon: PartyPopper,
+      peopleText: "Máximo 150 personas",
+      extra: "Horario: 7:00 pm a 2:30 am",
+      fallbackImage: "/salon-eventos.jpg",
+    }
+  }
+
+  return {
+    kind: "DAY_PASS" as const,
     icon: SunMedium,
-    image: "/pasadia.jpg",
-  },
-  {
-    id: "EVENT_HALL",
-    title: "Salón de eventos",
-    description:
-      "Reserva nuestro salón social para celebraciones, reuniones y eventos especiales.",
-    price: 2000000,
-    extra: "Horario: 7:00 pm a 2:30 am · Aforo máximo: 150 personas",
-    icon: PartyPopper,
-    image: "/salon-eventos.jpg",
-  },
-]
+    peopleText: "Mínimo 20 personas",
+    extra: "Persona adicional: $25.000 COP",
+    fallbackImage: "/pasadia.jpg",
+  }
+}
 
 export function ServicesOtherDay() {
+  const [services, setServices] = useState<BackendService[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+
+    ;(async () => {
+      try {
+        const data = await listServicesPublicService()
+        if (!alive) return
+
+        const filtered = (data ?? []).filter(
+          (service) => service.status === "ACTIVE" && service.type === "DAY_PASS"
+        )
+
+        setServices(filtered)
+      } catch {
+        if (!alive) return
+        setServices([])
+      } finally {
+        if (alive) setLoading(false)
+      }
+    })()
+
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const featured = useMemo(() => services.slice(0, 2), [services])
+
   return (
     <section id="services" className="px-4 py-20">
       <div className="mx-auto max-w-7xl">
@@ -45,9 +82,21 @@ export function ServicesOtherDay() {
           </p>
         </div>
 
+        {loading && (
+          <p className="text-center text-muted-foreground">Cargando servicios...</p>
+        )}
+
+        {!loading && featured.length === 0 && (
+          <p className="text-center text-muted-foreground">
+            No hay servicios disponibles en este momento.
+          </p>
+        )}
+
         <div className="grid gap-6 md:grid-cols-2">
-          {options.map((service) => {
-            const Icon = service.icon
+          {featured.map((service) => {
+            const meta = getExtraServiceMeta(service)
+            const Icon = meta.icon
+            const image = service.images?.[0]?.url || meta.fallbackImage
 
             return (
               <div
@@ -56,8 +105,8 @@ export function ServicesOtherDay() {
               >
                 <div className="relative h-56 overflow-hidden">
                   <img
-                    src={service.image}
-                    alt={service.title}
+                    src={image}
+                    alt={service.name}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -72,7 +121,7 @@ export function ServicesOtherDay() {
                 </div>
 
                 <div className="p-5">
-                  <h3 className="text-lg font-bold text-card-foreground">{service.title}</h3>
+                  <h3 className="text-lg font-bold text-card-foreground">{service.name}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                     {service.description}
                   </p>
@@ -80,11 +129,11 @@ export function ServicesOtherDay() {
                   <div className="mt-4 space-y-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4 text-accent" />
-                      <span>{service.id === "DAY_PASS" ? "Mínimo 20 personas" : "Máximo 150 personas"}</span>
+                      <span>{meta.peopleText}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-accent" />
-                      <span>{service.extra}</span>
+                      <span>{meta.extra}</span>
                     </div>
                   </div>
 

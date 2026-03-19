@@ -1,3 +1,4 @@
+// app/admin/(panel)/services/page.tsx
 "use client"
 
 import React, { useEffect, useMemo, useRef, useState } from "react"
@@ -30,6 +31,7 @@ function normalizeService(s: any): BackendService {
   return {
     ...s,
     description: s.description ?? s.decription ?? "",
+    type: s.type ?? "STAY",
     images: Array.isArray(s.images) ? s.images : [],
   }
 }
@@ -79,6 +81,8 @@ function ServiceForm({
   const hasExistingImages = (service?.images?.length ?? 0) > 0
   const hasUploadedIds = uploadedImageIds.length > 0
 
+  const [type, setType] = useState<"STAY" | "DAY_PASS">(service?.type ?? "STAY")
+
   // Regla: NO se puede guardar si:
   // - creando: no hay uploaded ids
   // - editando: si NO hay uploaded ids Y tampoco hay imágenes existentes
@@ -105,6 +109,7 @@ function ServiceForm({
     setError(null)
     setUploading(false)
     setSaving(false)
+    setType(service?.type ?? "STAY")
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [service?.id])
 
@@ -178,6 +183,7 @@ function ServiceForm({
       price,
       billingType,
       imagesIds: imagesIdsToSend,
+      type,
     })
 
       await onSave({
@@ -186,6 +192,7 @@ function ServiceForm({
         price,
         billingType,
         imagesIds: imagesIdsToSend,
+        type,
       })
 
       onClose()
@@ -222,6 +229,19 @@ function ServiceForm({
           </SelectContent>
         </Select>
       </div>
+
+      <div className="space-y-2">
+      <Label>Tipo de servicio</Label>
+      <Select value={type} onValueChange={(v) => setType(v as "STAY" | "DAY_PASS")}>
+        <SelectTrigger>
+          <SelectValue placeholder="Selecciona..." />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="STAY">STAY</SelectItem>
+          <SelectItem value="DAY_PASS">DAY_PASS</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
 
       <div className="space-y-2">
         <Label>Precio ($)</Label>
@@ -436,6 +456,10 @@ export default function AdminServicesPage() {
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline" className="text-xs">
                     {svc.billingType === "HOURLY" ? "Por hora" : "Fijo"}
+                  </Badge>
+
+                  <Badge variant="secondary" className="text-xs">
+                    {svc.type}
                   </Badge>
                 </div>
 

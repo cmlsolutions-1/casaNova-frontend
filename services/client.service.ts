@@ -1,5 +1,5 @@
 //services/client.service.ts
-import { apiFetch } from "@/lib/api-fetch"
+import { apiFetch } from "@/lib/api"
 
 export type BackendClient = {
   id: string
@@ -27,5 +27,6 @@ export async function upsertClientPublicService(body: UpsertClientBody) {
   return apiFetch<any>("/api/client", {
     method: "POST",
     body: JSON.stringify(body),
+    rawResponse: true,
   })
 }

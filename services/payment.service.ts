@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api-fetch"
+import { apiFetch } from "@/lib/api"
 
 export type CreatePaymentBody = {
   reservationId: string
@@ -21,5 +21,6 @@ export async function createPaymentPublicService(body: CreatePaymentBody) {
   return apiFetch<PaymentPreferenceResponse>("/api/payment", {
     method: "POST",
     body: JSON.stringify(body),
+    rawResponse: true,
   })
 }

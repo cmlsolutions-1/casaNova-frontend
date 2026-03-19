@@ -1,4 +1,6 @@
-import { apiFetch } from "@/lib/api-fetch"
+//services/reservation.service.ts
+
+import { apiFetch } from "@/lib/api"
 
 export type ReservationStatus =
   | "PENDING"
@@ -7,11 +9,14 @@ export type ReservationStatus =
   | "PAID_PENDING_APPROVAL"
   | "APPROVED"
 
+export type ReservationType = "STAY" | "DAY_PASS"
+
 export type CreateReservationBody = {
   startDate: string
   endDate: string
   clientDocument: string
-  rooms: Array<{
+  type: ReservationType
+  rooms?: Array<{
     roomId: string
     numberOfPeople: number
     children?: number
@@ -84,6 +89,7 @@ export async function createReservationPublicService(body: CreateReservationBody
   return apiFetch<any>("/api/reservations", {
     method: "POST",
     body: JSON.stringify(body),
+    rawResponse: true,
   })
 }
 
@@ -190,6 +196,7 @@ function buildReservationsQuery(params?: ListReservationsParams) {
 export async function listReservationsService(params?: ListReservationsParams) {
   return apiFetch<BackendReservationList>(buildReservationsQuery(params), {
     method: "GET",
+    rawResponse: true,
   })
 }
 

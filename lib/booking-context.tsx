@@ -46,7 +46,9 @@ interface BookingConsents {
 }
 
 interface ExtraBookingSelection {
-  type: ExtraBookingType
+  serviceId: string
+  serviceName: string
+  kind: "DAY_PASS" | "EVENT_HALL"
   date: string
   people: number
   totalPrice: number

@@ -1,41 +1,98 @@
 //app/booking/extra-service/[type]/page.tsx
+
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, ArrowRight, CalendarDays, Minus, Plus, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
-import { EXTRA_BOOKING_OPTIONS, type ExtraBookingType } from "@/lib/day-services"
 import { useBooking } from "@/lib/booking-context"
 import { formatCurrencyCOP } from "@/utils/format"
+import {
+  listServicesPublicService,
+  type BackendService,
+} from "@/services/service.service"
+
+function getExtraServiceKind(serviceName: string): "DAY_PASS" | "EVENT_HALL" {
+  const name = serviceName.toLowerCase()
+
+  if (name.includes("salon") || name.includes("salón")) {
+    return "EVENT_HALL"
+  }
+
+  return "DAY_PASS"
+}
 
 export default function ExtraServiceBookingPage() {
   const router = useRouter()
   const params = useParams()
   const { setExtraBooking } = useBooking()
 
-  const type = params.type as ExtraBookingType
-  const config = EXTRA_BOOKING_OPTIONS[type]
+  const serviceId = String(params.type)
 
+  const [service, setService] = useState<BackendService | null>(null)
+  const [loading, setLoading] = useState(true)
   const [date, setDate] = useState("")
-  const [people, setPeople] = useState(config?.minPeople || 150)
+  const [people, setPeople] = useState(20)
   const [error, setError] = useState("")
 
-  const total = useMemo(() => {
-    if (!config) return 0
+  useEffect(() => {
+    let alive = true
 
-    if (type === "DAY_PASS") {
-      const minPeople = config.minPeople || 20
-      const extraPeople = Math.max(0, people - minPeople)
-      return config.basePrice + extraPeople * (config.additionalPersonPrice || 0)
+    ;(async () => {
+      try {
+        setLoading(true)
+
+        const services = await listServicesPublicService()
+        if (!alive) return
+
+        const found = (services ?? []).find(
+          (item) => item.id === serviceId && item.status === "ACTIVE" && item.type === "DAY_PASS"
+        )
+
+        setService(found || null)
+
+        if (found) {
+          const kind = getExtraServiceKind(found.name)
+          setPeople(kind === "DAY_PASS" ? 20 : 1)
+        }
+      } catch {
+        if (!alive) return
+        setService(null)
+      } finally {
+        if (alive) setLoading(false)
+      }
+    })()
+
+    return () => {
+      alive = false
+    }
+  }, [serviceId])
+
+  const kind = service ? getExtraServiceKind(service.name) : null
+
+  const total = useMemo(() => {
+    if (!service || !kind) return 0
+
+    if (kind === "DAY_PASS") {
+      const extraPeople = Math.max(0, people - 20)
+      return Number(service.price) + extraPeople * 25000
     }
 
-    return config.basePrice
-  }, [config, people, type])
+    return Number(service.price)
+  }, [service, kind, people])
 
-  if (!config) {
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-20 text-center">
+        <p className="text-muted-foreground">Cargando servicio...</p>
+      </div>
+    )
+  }
+
+  if (!service || !kind) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-20 text-center">
         <p className="text-muted-foreground">Servicio no válido.</p>
@@ -51,18 +108,20 @@ export default function ExtraServiceBookingPage() {
       return
     }
 
-    if (type === "DAY_PASS" && people < 20) {
+    if (kind === "DAY_PASS" && people < 20) {
       setError("El pasadía requiere mínimo 20 personas.")
       return
     }
 
-    if (type === "EVENT_HALL" && people > 150) {
+    if (kind === "EVENT_HALL" && people > 150) {
       setError("El salón de eventos permite máximo 150 personas.")
       return
     }
 
     setExtraBooking({
-      type,
+      serviceId: service.id,
+      serviceName: service.name,
+      kind,
       date,
       people,
       totalPrice: total,
@@ -83,9 +142,9 @@ export default function ExtraServiceBookingPage() {
           Reserva especial
         </p>
         <h1 className="font-serif text-3xl font-bold text-foreground md:text-4xl">
-          {config.title}
+          {service.name}
         </h1>
-        <p className="mt-3 max-w-2xl text-muted-foreground">{config.description}</p>
+        <p className="mt-3 max-w-2xl text-muted-foreground">{service.description}</p>
       </div>
 
       <Card className="border-border shadow-lg">
@@ -122,7 +181,7 @@ export default function ExtraServiceBookingPage() {
                       type="button"
                       onClick={() =>
                         setPeople((prev) =>
-                          Math.max(type === "DAY_PASS" ? 20 : 1, prev - 1)
+                          Math.max(kind === "DAY_PASS" ? 20 : 1, prev - 1)
                         )
                       }
                       className="flex h-8 w-8 items-center justify-center rounded-full border border-border hover:bg-secondary"
@@ -134,7 +193,7 @@ export default function ExtraServiceBookingPage() {
                       type="button"
                       onClick={() =>
                         setPeople((prev) =>
-                          Math.min(type === "EVENT_HALL" ? 150 : 300, prev + 1)
+                          Math.min(kind === "EVENT_HALL" ? 150 : 300, prev + 1)
                         )
                       }
                       className="flex h-8 w-8 items-center justify-center rounded-full border border-border hover:bg-secondary"
@@ -160,7 +219,7 @@ export default function ExtraServiceBookingPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between gap-4">
                   <span className="text-muted-foreground">Servicio</span>
-                  <span className="font-medium text-foreground">{config.title}</span>
+                  <span className="font-medium text-foreground">{service.name}</span>
                 </div>
 
                 <div className="flex justify-between gap-4">
@@ -175,10 +234,24 @@ export default function ExtraServiceBookingPage() {
                   <span className="font-medium text-foreground">{people}</span>
                 </div>
 
-                {config.schedule && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Condición</span>
+                  <span className="font-medium text-foreground">
+                    {kind === "DAY_PASS" ? "Mínimo 20 personas" : "Máximo 150 personas"}
+                  </span>
+                </div>
+
+                {kind === "EVENT_HALL" && (
                   <div className="flex justify-between gap-4">
                     <span className="text-muted-foreground">Horario</span>
-                    <span className="font-medium text-foreground">{config.schedule}</span>
+                    <span className="font-medium text-foreground">7:00 pm a 2:30 am</span>
+                  </div>
+                )}
+
+                {kind === "DAY_PASS" && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Adicional</span>
+                    <span className="font-medium text-foreground">$25.000 por persona</span>
                   </div>
                 )}
 

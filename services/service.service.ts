@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api"
 
 export type ServiceStatus = "ACTIVE" | "INACTIVE"
 export type ServiceBillingType = "FIXED" | "HOURLY"
+export type ServiceType = "STAY" | "DAY_PASS"
 
 export type BackendImage = { id: string; url: string }
 
@@ -15,6 +16,7 @@ export type BackendService = {
   price: number
   status: ServiceStatus
   billingType: ServiceBillingType
+  type: ServiceType
   images: BackendImage[]
 }
 
@@ -22,6 +24,7 @@ function normalizeService(s: any): BackendService {
   return {
     ...s,
     description: s.description ?? s.decription ?? "",
+    type: s.type ?? "STAY",
     images: Array.isArray(s.images) ? s.images : [],
   }
 }
@@ -32,6 +35,7 @@ export type ServiceUpsertBody = {
   decription?: string
   price: number
   billingType: ServiceBillingType
+  type: ServiceType
   imagesIds: string[]
 }
 
@@ -40,8 +44,6 @@ export async function listServicesService() {
 }
 
 export async function createServiceService(body: ServiceUpsertBody) {
-  console.log("BODY QUE SE ENVÍA AL BACKEND:", body)
-  
   return apiFetch<BackendService>("/api/service", {
     method: "POST",
     auth: true,

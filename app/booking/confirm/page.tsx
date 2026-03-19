@@ -37,7 +37,7 @@ export default function BookingConfirmPage() {
   const [payError, setPayError] = useState<string | null>(null)
 
   const isExtraBooking = !!extraBooking
-  const extraConfig = extraBooking ? EXTRA_BOOKING_OPTIONS[extraBooking.type] : null
+  const extraConfig = extraBooking ? EXTRA_BOOKING_OPTIONS[extraBooking.kind] : null
   
 
   const handleGoToMercadoPago = async () => {
@@ -62,17 +62,73 @@ export default function BookingConfirmPage() {
       throw new Error(clientRes?.message || "No se pudo crear/actualizar el cliente")
     }
 
-    // 2) flujo temporal mock para pasadía / salón
+    console.log("isExtraBooking =>", isExtraBooking)
+    console.log("extraBooking =>", extraBooking)
+    console.log("extraConfig =>", extraConfig)
+
+    // 2) flujo real para pasadía / salón
     if (isExtraBooking && extraBooking) {
-      console.log("MOCK EXTRA BOOKING =>", {
-        extraBooking,
-        guestInfo,
+      const selectedDate = new Date(extraBooking.date)
+
+      const startAt = new Date(selectedDate)
+      const endAt = new Date(selectedDate)
+
+      if (extraBooking.kind === "EVENT_HALL") {
+        startAt.setHours(19, 0, 0, 0)
+
+        // termina al día siguiente a las 2:30 am
+        endAt.setDate(endAt.getDate() + 1)
+        endAt.setHours(2, 30, 0, 0)
+      } else {
+        // Pasadía: mismo día
+        startAt.setHours(8, 0, 0, 0)
+        endAt.setHours(18, 0, 0, 0)
+      }
+
+      const reservationBody = {
+        startDate: startAt.toISOString(),
+        endDate: endAt.toISOString(),
+        clientDocument: guestInfo.documentNumber,
+        type: "DAY_PASS" as const,
+        services: [
+          {
+            serviceId: extraBooking.serviceId,
+            amount: extraBooking.people,
+            startAt: startAt.toISOString(),
+            endAt: endAt.toISOString(),
+          },
+        ],
+      }
+
+      console.log("BODY DAY_PASS =>", reservationBody)
+
+      const reservationRes = await createReservationPublicService(reservationBody)
+
+      if (!reservationRes?.ok) {
+        throw new Error(reservationRes?.message || "No se pudo crear la reserva del servicio")
+      }
+
+      const reservationId = reservationRes.data?.id
+      if (!reservationId) {
+        throw new Error("El backend no devolvió id de reserva")
+      }
+
+      const paymentRes = await createPaymentPublicService({
+        reservationId,
       })
 
-      setTimeout(() => {
-        router.push("/booking/success?id=mock-extra-booking")
-      }, 800)
+      if (!paymentRes?.ok) {
+        throw new Error(paymentRes?.message || "No se pudo generar el link de pago")
+      }
 
+      const checkoutUrl =
+        paymentRes.data?.initPoint || paymentRes.data?.sandboxInitPoint
+
+      if (!checkoutUrl) {
+        throw new Error("No se recibió el link de pago de Mercado Pago")
+      }
+
+      window.location.href = checkoutUrl
       return
     }
 
@@ -164,6 +220,7 @@ export default function BookingConfirmPage() {
       startDate: startISO,
       endDate: endISO,
       clientDocument: guestInfo.documentNumber,
+      type: "STAY" as const,
       rooms: roomsPayload,
       ...(servicesPayload ? { services: servicesPayload } : {}),
     }
@@ -375,7 +432,7 @@ export default function BookingConfirmPage() {
                 </h2>
                 <button
                   type="button"
-                  onClick={() => router.push(`/booking/extra-service/${extraBooking.type}`)}
+                  onClick={() => router.push(`/booking/extra-service/${extraBooking.serviceId}`)}
                   className="flex items-center gap-1 text-xs text-accent hover:underline"
                 >
                   <Pencil className="h-3 w-3" /> Cambiar
