@@ -53,11 +53,11 @@ export function PublicFooter() {
             <div className="flex flex-col gap-3">
               <span className="flex items-center gap-2 text-sm text-primary-foreground/70">
                 <MapPin className="h-4 w-4 text-accent" />
-                Av. del Mar 1234, Cartagena
+                Hojas Anchas, Ramal agucatal Circasia-Quindio
               </span>
               <span className="flex items-center gap-2 text-sm text-primary-foreground/70">
                 <Phone className="h-4 w-4 text-accent" />
-                +57 (5) 660 1234
+                +573007972614
               </span>
               <span className="flex items-center gap-2 text-sm text-primary-foreground/70">
                 <Mail className="h-4 w-4 text-accent" />

@@ -29,11 +29,28 @@ const statusLabels: Record<string, string> = {
   REJECTED: "Rechazada",
 }
 
-const statusVariant = (s: string) => {
-  if (s === "APPROVED" || s === "CONFIRMED") return "default" as const
-  if (s === "REJECTED") return "destructive" as const
-  if (s === "PAID_PENDING_APPROVAL") return "secondary" as const
-  return "outline" as const
+const statusClassName = (s: string) => {
+  if (s === "PENDING") {
+    return "bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-100"
+  }
+
+  if (s === "PAID_PENDING_APPROVAL") {
+    return "bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-100"
+  }
+
+  if (s === "APPROVED") {
+    return "bg-orange-100 text-orange-800 border border-orange-300 hover:bg-orange-100"
+  }
+
+  if (s === "CONFIRMED") {
+    return "bg-green-100 text-green-800 border border-green-300 hover:bg-green-100"
+  }
+
+  if (s === "REJECTED") {
+    return "bg-red-100 text-red-800 border border-red-300 hover:bg-red-100"
+  }
+
+  return "bg-muted text-muted-foreground border border-border"
 }
 
 export default function AdminReservationsPage() {
@@ -208,7 +225,7 @@ export default function AdminReservationsPage() {
                       {formatCurrencyCOP(res.totalValue)}
                     </td>
                     <td className="py-3 pr-4">
-                      <Badge variant={statusVariant(res.status)}>
+                      <Badge className={statusClassName(res.status)}>
                         {statusLabels[res.status] || res.status}
                       </Badge>
                     </td>
@@ -251,7 +268,7 @@ export default function AdminReservationsPage() {
 
                 <div>
                   <p className="text-muted-foreground">Estado</p>
-                  <Badge variant={statusVariant(selectedRes.status)}>
+                  <Badge className={statusClassName(selectedRes.status)}>
                     {statusLabels[selectedRes.status] || selectedRes.status}
                   </Badge>
                 </div>

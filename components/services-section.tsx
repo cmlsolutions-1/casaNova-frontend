@@ -29,7 +29,9 @@ export function ServicesSection() {
         if (!alive) return
 
         // opcional: solo activos
-        const filtered = (data ?? []).filter((s) => s.status === "ACTIVE")
+        const filtered = (data ?? []).filter(
+          (service) => service.status === "ACTIVE" && service.type === "STAY"
+        )
         setServices(filtered)
       } catch {
         if (!alive) return

@@ -133,18 +133,36 @@ export default function AdminDashboard() {
   }, [reservations])
 
   const statusLabels: Record<string, string> = {
-    PENDING: "Pendiente",
-    PAID_PENDING_APPROVAL: "Pago pendiente aprobación",
-    APPROVED: "Aprobada",
-    CONFIRMED: "Confirmada",
-    REJECTED: "Rechazada",
+  PENDING: "Pendiente",
+  PAID_PENDING_APPROVAL: "Pago pendiente aprobación",
+  APPROVED: "Aprobada",
+  CONFIRMED: "Confirmada",
+  REJECTED: "Rechazada",
+}
+
+const statusClassName = (s: string) => {
+  if (s === "PENDING") {
+    return "bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-100"
   }
 
-  const statusVariant = (s: string) => {
-    if (s === "APPROVED" || s === "CONFIRMED") return "default" as const
-    if (s === "REJECTED") return "destructive" as const
-    return "secondary" as const
+  if (s === "PAID_PENDING_APPROVAL") {
+    return "bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-100"
   }
+
+  if (s === "APPROVED") {
+    return "bg-orange-100 text-orange-800 border border-orange-300 hover:bg-orange-100"
+  }
+
+  if (s === "CONFIRMED") {
+    return "bg-green-100 text-green-800 border border-green-300 hover:bg-green-100"
+  }
+
+  if (s === "REJECTED") {
+    return "bg-red-100 text-red-800 border border-red-300 hover:bg-red-100"
+  }
+
+  return "bg-muted text-muted-foreground border border-border"
+}
 
   return (
     <div className="space-y-6">
@@ -222,7 +240,7 @@ export default function AdminDashboard() {
                           {formatCurrencyCOP(res.totalValue)}
                         </td>
                         <td className="py-3">
-                          <Badge variant={statusVariant(res.status)}>
+                          <Badge className={statusClassName(res.status)}>
                             {statusLabels[res.status] || res.status}
                           </Badge>
                         </td>

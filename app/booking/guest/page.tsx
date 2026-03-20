@@ -194,7 +194,7 @@ export default function BookingGuestPage() {
             variant="outline"
             onClick={() => {
               if (booking.extraBooking) {
-                router.push(`/booking/extra-service/${booking.extraBooking.type}`)
+                router.push(`/booking/extra-service/${booking.extraBooking.kind}`)
                 return
               }
               router.push("/booking/services")

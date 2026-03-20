@@ -1,3 +1,5 @@
+//app/page.tsx
+
 import { PublicHeader } from "@/components/public-header"
 import { HeroCarousel } from "@/components/hero-carousel"
 import { SearchBar } from "@/components/search-bar"
@@ -7,6 +9,7 @@ import { PublicFooter } from "@/components/public-footer"
 import { getHeroImages } from "@/lib/hero-images"
 import { LocationSection } from "@/components/location-section"
 import { ServicesOtherDay } from "@/components/services-otherday"
+import { ZonaSocialSection } from "@/components/zonaSocial-section"
 
 export default function Page() {
   const images = getHeroImages()
@@ -19,6 +22,7 @@ export default function Page() {
       <RoomsPreview />
       <ServicesSection />
       <ServicesOtherDay />
+      <ZonaSocialSection />
       <LocationSection />
       <PublicFooter />
     </main>

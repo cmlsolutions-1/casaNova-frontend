@@ -137,12 +137,12 @@ export function RoomsPreview() {
                     </span>
                   </div>
 
-                  <Link href={`/rooms/${room.id}`} className="mt-4 block">
+                 {/*  <Link href={`/rooms/${room.id}`} className="mt-4 block">
                     <Button variant="outline" className="w-full rounded-xl border-accent text-accent hover:bg-accent hover:text-accent-foreground bg-transparent">
                       <Eye className="mr-2 h-4 w-4" />
                       Ver Detalles
                     </Button>
-                  </Link>
+                  </Link> */}
                 </div>
               </div>
             )

@@ -101,6 +101,8 @@ export default function BookingConfirmPage() {
       }
 
       console.log("BODY DAY_PASS =>", reservationBody)
+      console.log("SELECTED ROOMS =>", selectedRooms)
+      console.log("BODY RESERVATION =>", reservationBody)
 
       const reservationRes = await createReservationPublicService(reservationBody)
 
@@ -225,7 +227,11 @@ export default function BookingConfirmPage() {
       ...(servicesPayload ? { services: servicesPayload } : {}),
     }
 
-    console.log("BODY RESERVATION =>", reservationBody)
+
+    console.log("SELECTED ROOMS =>", JSON.stringify(selectedRooms, null, 2))
+console.log("ROOMS PAYLOAD =>", JSON.stringify(roomsPayload, null, 2))
+console.log("SERVICES PAYLOAD =>", JSON.stringify(servicesPayload, null, 2))
+console.log("RESERVATION BODY =>", JSON.stringify(reservationBody, null, 2))
 
     const reservationRes = await createReservationPublicService(reservationBody)
 

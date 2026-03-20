@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Sparkles, Minus, Plus, ArrowRight } from "lucide-react"
 import type { SelectedService } from "@/lib/mock-data"
 import { listServicesPublicService, type BackendService } from "@/services/service.service"
+import { formatCurrencyCOP } from "@/utils/format"
 
 export default function BookingServicesPage() {
   const router = useRouter()
@@ -37,7 +38,7 @@ export default function BookingServicesPage() {
   }, [hydrated, booking.selectedRooms, router])
 
   const activeServices = useMemo(
-    () => services.filter((s) => s.status === "ACTIVE"),
+    () => services.filter((s) => s.status === "ACTIVE" && s.type === "STAY"),
     [services],
   )
 
@@ -107,7 +108,9 @@ export default function BookingServicesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <h3 className="text-base font-bold text-card-foreground">{service.name}</h3>
-                      <span className="font-bold text-foreground whitespace-nowrap">${service.price}</span>
+                      <span className="font-bold text-foreground whitespace-nowrap">
+                        {formatCurrencyCOP(service.price)}
+                      </span>
                     </div>
 
                     <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
@@ -156,7 +159,7 @@ export default function BookingServicesPage() {
       {total > 0 && (
         <div className="mt-6 rounded-xl bg-accent/10 p-4 text-center">
           <span className="text-sm text-muted-foreground">Total servicios adicionales: </span>
-          <span className="text-lg font-bold text-accent">${total} USD</span>
+          <span className="text-lg font-bold text-accent">{formatCurrencyCOP(total)}</span>
         </div>
       )}
 

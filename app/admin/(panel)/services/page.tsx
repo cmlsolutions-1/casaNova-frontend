@@ -237,8 +237,8 @@ function ServiceForm({
           <SelectValue placeholder="Selecciona..." />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="STAY">STAY</SelectItem>
-          <SelectItem value="DAY_PASS">DAY_PASS</SelectItem>
+          <SelectItem value="STAY">ALOJAMIENTO</SelectItem>
+          <SelectItem value="DAY_PASS">PASADIA O SALON</SelectItem>
         </SelectContent>
       </Select>
     </div>
