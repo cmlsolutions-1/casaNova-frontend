@@ -1,3 +1,4 @@
+//components/zonaSocial-section.tsx
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
@@ -34,14 +35,68 @@ const zonasSociales: ZonaSocialItem[] = [
   {
     id: 4,
     title: "Experiencias memorables",
-    subtitle: "Cada rincón está diseñado para que disfrutes al máximo tu estadía",
+    subtitle: "Diversión auténtica con el sabor de la tradición",
     image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/TEJO.jpg",
   },
   {
     id: 5,
-    title: "Experiencias memorables otro ",
-    subtitle: "Cada rincón está diseñado para que disfrutes al máximo tu estadía",
-    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/TEJO.jpg",
+    title: "Sabores que enamoran",
+    subtitle: "Experiencias gastronómicas en un entorno natural y acogedor",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/RESTAURANTE.jpg",
+  },
+  {
+    id: 6,
+    title: "Diversión tradicional",
+    subtitle: "Un clásico para disfrutar entre amigos y familiares",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/RANA.jpg",
+  },
+  {
+    id: 7,
+    title: "Comodidad garantizada",
+    subtitle: "Seguridad y fácil acceso para tu vehículo durante tu estadía",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/PARQUEADERO.jpg",
+  },
+  {
+    id: 8,
+    title: "Relajación total",
+    subtitle: "Desconéctate en un ambiente de confort",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/JACUZZY.jpg",
+  },
+  {
+    id: 9,
+    title: "Pasión en movimiento",
+    subtitle: "Vive el deporte al aire libre",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/CANCHAFUTBOL.jpg",
+  },
+  {
+    id: 10,
+    title: "Tradición que une",
+    subtitle: "Diversión para compartir en grupo",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/BOLIRANA.jpg",
+  },
+  {
+    id: 11,
+    title: "Plan perfecto",
+    subtitle: "Diversión y buen ambiente en un solo lugar",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/BILLAR.jpg",
+  },
+  {
+    id: 12,
+    title: "Momentos para brindar",
+    subtitle: "Un espacio para disfrutar y compartir",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/BAR2.jpg",
+  },
+  {
+    id: 13,
+    title: "Momentos para brindar",
+    subtitle: "Un espacio para disfrutar y compartir momentos especiales con amigos y seres queridos",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/BAR.jpg",
+  },
+  {
+    id: 14,
+    title: "Conexiones que importan",
+    subtitle: "Espacios diseñados para disfrutar en grupo o en pareja, creando recuerdos inolvidables",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/ZONASVERDES.jpg",
   },
 ]
 
@@ -70,12 +125,16 @@ export function ZonaSocialSection() {
   const currentItem = zonasSociales[current]
 
   const sideCards = useMemo(() => {
-    if (total <= 1) return []
+  if (total <= 1) return []
 
-    return zonasSociales
-      .filter((_, index) => index !== current)
-      .slice(0, 2)
-  }, [current, total])
+  const result = []
+
+  for (let i = 1; i <= Math.min(2, total - 1); i++) {
+    result.push(zonasSociales[(current + i) % total])
+  }
+
+  return result
+}, [current, total])
 
   return (
     <section id="zonas-sociales" className="px-4 py-20">
