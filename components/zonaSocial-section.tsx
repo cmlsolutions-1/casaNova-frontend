@@ -17,25 +17,31 @@ const zonasSociales: ZonaSocialItem[] = [
     id: 1,
     title: "Piscina & descanso",
     subtitle: "Espacios pensados para relajarte y disfrutar del clima",
-    image: "https://tu-space-digitalocean.com/zonas-sociales/piscina-1.jpg",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/PISCINA.jpg",
   },
   {
     id: 2,
     title: "Ambientes para compartir",
     subtitle: "Zonas ideales para conversar, descansar y vivir momentos especiales",
-    image: "https://tu-space-digitalocean.com/zonas-sociales/social-1.jpg",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/ZONAESTAR.jpg",
   },
   {
     id: 3,
     title: "Naturaleza y tranquilidad",
     subtitle: "Un entorno acogedor para desconectarte y respirar calma",
-    image: "https://tu-space-digitalocean.com/zonas-sociales/naturaleza-1.jpg",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/ZONASOCIAL.jpg",
   },
   {
     id: 4,
     title: "Experiencias memorables",
     subtitle: "Cada rincón está diseñado para que disfrutes al máximo tu estadía",
-    image: "https://tu-space-digitalocean.com/zonas-sociales/experiencia-1.jpg",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/TEJO.jpg",
+  },
+  {
+    id: 5,
+    title: "Experiencias memorables otro ",
+    subtitle: "Cada rincón está diseñado para que disfrutes al máximo tu estadía",
+    image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/TEJO.jpg",
   },
 ]
 

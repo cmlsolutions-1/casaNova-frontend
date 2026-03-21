@@ -112,9 +112,25 @@ export default function AdminLoginPage() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={loading}>
-              {loading ? "Ingresando..." : "Ingresar"}
-            </Button>
+            <div className="space-y-2">
+              <Button
+                type="submit"
+                className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+                disabled={loading}
+              >
+                {loading ? "Ingresando..." : "Ingresar"}
+              </Button>
+
+              <Button
+                type="button"
+                className="w-full bg-zinc-800 text-white hover:bg-zinc-700"
+                onClick={() => router.push("/")}
+              >
+                ← Volver al inicio
+              </Button>
+            </div>
+
+          
 
           </form>
         </CardContent>

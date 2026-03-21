@@ -87,6 +87,21 @@ export default function AdminReservationsPage() {
     }
   }
 
+  const getReservationDetailLabel = (res: ReservationListItem) => {
+  const roomNames = res.rooms?.map((room) => room.nameRoom).filter(Boolean) ?? []
+  const serviceNames = res.services?.map((service) => service.name).filter(Boolean) ?? []
+
+    if (roomNames.length > 0) {
+      return roomNames.join(", ")
+    }
+
+    if (serviceNames.length > 0) {
+      return serviceNames.join(", ")
+    }
+
+    return "Sin detalle"
+  }
+
   useEffect(() => {
     loadReservations()
   }, [])
@@ -195,9 +210,9 @@ export default function AdminReservationsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="pb-3 pr-4 font-medium">Código</th>
+                <th className="pb-3 pr-4 font-medium">Nro Reserva</th>
                 <th className="pb-3 pr-4 font-medium">Huésped</th>
-                <th className="pb-3 pr-4 font-medium">Habitación</th>
+                <th className="pb-3 pr-4 font-medium">Habitación/Servicio</th>
                 <th className="pb-3 pr-4 font-medium">Fechas</th>
                 <th className="pb-3 pr-4 font-medium">Total</th>
                 <th className="pb-3 pr-4 font-medium">Estado</th>
@@ -206,8 +221,7 @@ export default function AdminReservationsPage() {
             </thead>
             <tbody>
               {filtered.map((res) => {
-                const roomNames =
-                  res.rooms?.map((room) => room.nameRoom).join(", ") || "Sin habitación"
+                const detailLabel = getReservationDetailLabel(res)
 
                 return (
                   <tr key={res.id} className="border-b border-border/50 last:border-0">
@@ -217,7 +231,7 @@ export default function AdminReservationsPage() {
                     <td className="py-3 pr-4 text-foreground">
                       {res.client?.fullName || res.client?.documentNumber || "Sin nombre"}
                     </td>
-                    <td className="py-3 pr-4 text-muted-foreground">{roomNames}</td>
+                    <td className="py-3 pr-4 text-muted-foreground">{detailLabel}</td>
                     <td className="py-3 pr-4 text-xs text-muted-foreground">
                       {formatDateSpanish(res.startDate)} - {formatDateSpanish(res.endDate)}
                     </td>
