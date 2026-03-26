@@ -204,7 +204,7 @@ function ServiceForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
       {error && <p className="text-red-500">{error}</p>}
 
       <div className="space-y-2">
@@ -404,7 +404,7 @@ export default function AdminServicesPage() {
               </Button>
             </DialogTrigger>
 
-            <DialogContent>
+            <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Crear servicio</DialogTitle>
               </DialogHeader>
@@ -512,7 +512,7 @@ export default function AdminServicesPage() {
 
       {/* Edit Dialog */}
       <Dialog open={!!editingService} onOpenChange={(open) => !open && setEditingService(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Editar servicio</DialogTitle>
           </DialogHeader>

@@ -167,12 +167,12 @@ const statusClassName = (s: string) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-serif text-3xl font-bold text-foreground">Dashboard</h1>
+        <h1 className="font-serif text-3xl font-bold text-foreground">Panel de Administración</h1>
         <p className="text-muted-foreground">
-          Bienvenido, {adminAuth.user?.name}.{" "}
+          Bienvenido, {adminAuth.user?.role}.{" "}
           {adminAuth.user?.role === "EMPLOYEE"
             ? "Vista de empleado (solo lectura)."
-            : "Panel de administración."}
+            :""}
         </p>
         {servicesError && <p className="mt-2 text-sm text-red-500">{servicesError}</p>}
         {reservationsError && <p className="mt-2 text-sm text-red-500">{reservationsError}</p>}
