@@ -27,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { Plus, Pencil, Upload, X, Loader2 } from "lucide-react"
 import { formatCurrencyCOP } from "@/utils/format"
+import { DialogDescription } from "@/components/ui/dialog"
 
 function normalizeService(s: any): BackendService {
   return {
@@ -80,6 +81,24 @@ function ServiceForm({
   const hasExistingImages = (service?.images?.length ?? 0) > 0
   const hasUploadedIds = uploadedImageIds.length > 0
 
+  const MAX_SERVICE_IMAGES = 6
+
+    function moveItemToFront<T extends { id: string }>(items: T[], id: string): T[] {
+      const index = items.findIndex((item) => item.id === id)
+      if (index <= 0) return items
+
+      const selected = items[index]
+      return [selected, ...items.filter((_, i) => i !== index)]
+    }
+
+    function moveArrayIndexToFront<T>(items: T[], index: number): T[] {
+      if (index <= 0 || index >= items.length) return items
+      const selected = items[index]
+      return [selected, ...items.filter((_, i) => i !== index)]
+    }
+
+  const [existingImages, setExistingImages] = useState(service?.images ?? [])
+
   const canSubmit = useMemo(() => {
     if (!isEdit) return hasUploadedIds
     return hasUploadedIds || hasExistingImages
@@ -99,6 +118,7 @@ function ServiceForm({
     setError(null)
     setUploading(false)
     setSaving(false)
+    setExistingImages(service?.images ?? [])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [service?.id])
 
@@ -114,19 +134,57 @@ function ServiceForm({
 
   const handlePickFiles = (files: FileList | null) => {
     if (!files) return
-    const next: LocalImage[] = []
 
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith("image/")) return
-      const id = Math.random().toString(36).slice(2)
-      const preview = URL.createObjectURL(file)
-      next.push({ id, file, preview })
-    })
+    const availableSlots = MAX_SERVICE_IMAGES - images.length
+
+    if (availableSlots <= 0) {
+      setError(`Solo puedes cargar máximo ${MAX_SERVICE_IMAGES} imágenes.`)
+      return
+    }
+
+    const validImages = Array.from(files).filter((file) =>
+      file.type.startsWith("image/")
+    )
+
+    const filesToAdd = validImages.slice(0, availableSlots)
+
+    if (filesToAdd.length < validImages.length) {
+      setError(`Solo puedes cargar máximo ${MAX_SERVICE_IMAGES} imágenes.`)
+    } else {
+      setError(null)
+    }
+
+    const next: LocalImage[] = filesToAdd.map((file) => ({
+      id: Math.random().toString(36).slice(2),
+      file,
+      preview: URL.createObjectURL(file),
+    }))
 
     if (next.length === 0) return
 
     setUploadedImageIds([])
     setImages((prev) => [...prev, ...next])
+  }
+
+  const makeLocalImageCover = (id: string) => {
+    const index = images.findIndex((img) => img.id === id)
+    if (index <= 0) return
+
+    setImages((prev) => moveItemToFront(prev, id))
+
+    if (uploadedImageIds.length === images.length) {
+      setUploadedImageIds((prev) => moveArrayIndexToFront(prev, index))
+    } else {
+      setUploadedImageIds([])
+    }
+  }
+
+  const makeExistingImageCover = (id: string) => {
+    setExistingImages((prev) => {
+      const next = moveItemToFront(prev, id)
+      console.log("existingImages reordered:", next.map((img) => img.id))
+      return next
+    })
   }
 
   const removeLocalImage = (id: string) => {
@@ -171,7 +229,7 @@ function ServiceForm({
       throw new Error("Debes subir las imágenes antes de guardar el servicio.")
     }
 
-    const existingImageIds = (service?.images ?? []).map((img) => img.id)
+    const existingImageIds = existingImages.map((img) => img.id)
 
     const imagesIdsToSend = isEdit
       ? uploadedImageIds.length > 0
@@ -192,6 +250,8 @@ function ServiceForm({
     console.log("uploadedImageIds al hacer submit:", uploadedImageIds)
     console.log("imagesIdsToSend:", imagesIdsToSend)
     console.log("BODY QUE SE ENVÍA:", body)
+
+    console.log("imagesIdsToSend (ORDEN):", imagesIdsToSend)
 
     await onSave(body)
     onClose()
@@ -257,8 +317,13 @@ function ServiceForm({
         />
       </div>
 
-      <div className="space-y-2">
-        <Label>Imágenes</Label>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label>Imágenes</Label>
+          <span className="text-xs text-muted-foreground">
+            Máximo {MAX_SERVICE_IMAGES} imágenes. La primera será la portada.
+          </span>
+        </div>
 
         <input
           ref={fileInputRef}
@@ -285,63 +350,120 @@ function ServiceForm({
           </Button>
 
           <Badge variant="outline" className="text-xs">
+            Seleccionadas: {images.length}/{MAX_SERVICE_IMAGES}
+          </Badge>
+
+          <Badge variant="outline" className="text-xs">
             {uploadedImageIds.length > 0
               ? `Subidas: ${uploadedImageIds.length}`
-              : "Aún no subidas (obligatorio)"}
+              : "Aún no subidas"}
           </Badge>
         </div>
 
         {isEdit && uploadedImageIds.length === 0 && hasExistingImages && (
           <p className="text-xs text-muted-foreground">
-            Si no subes nuevas imágenes, se conservarán las actuales.
+            Si no subes nuevas imágenes, se conservarán las actuales. También puedes elegir cuál será la portada.
           </p>
         )}
 
         {images.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">Seleccionadas ({images.length})</p>
+            <p className="text-xs text-muted-foreground">
+              Nuevas imágenes ({images.length}). La primera será la portada.
+            </p>
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {images.map((img) => (
-                <div key={img.id} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted">
-                  <img src={img.preview} alt={img.file.name} className="h-full w-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => removeLocalImage(img.id)}
-                    className="absolute right-2 top-2 rounded-full bg-destructive p-1.5 text-destructive-foreground opacity-100 transition-opacity sm:opacity-0 group-hover:opacity-100"
-                    aria-label="Eliminar imagen"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+              {images.map((img, index) => (
+                <div
+                  key={img.id}
+                  className="group relative aspect-square overflow-hidden rounded-lg border bg-muted"
+                >
+                  <img
+                    src={img.preview}
+                    alt={img.file.name}
+                    className="h-full w-full object-cover"
+                  />
+
+                  {index === 0 && (
+                    <Badge className="absolute left-2 top-2 border border-yellow-300 bg-yellow-100 text-yellow-800">
+                      Portada actual
+                    </Badge>
+                  )}
+
+                  <div className="absolute right-2 top-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => makeLocalImageCover(img.id)}
+                      className="rounded-md bg-black/70 px-2 py-1 text-[10px] text-white transition hover:bg-black"
+                    >
+                      Portada
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => removeLocalImage(img.id)}
+                      className="rounded-full bg-destructive p-1.5 text-destructive-foreground opacity-100 transition-opacity sm:opacity-0 group-hover:opacity-100"
+                      aria-label="Eliminar imagen"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
                     <p className="truncate text-xs text-white">{img.file.name}</p>
                   </div>
                 </div>
               ))}
             </div>
+
+            <p className="text-xs text-muted-foreground">
+              Si eliges una portada después de subir, vuelve a subir las imágenes para conservar el orden.
+            </p>
           </div>
         )}
 
-        {(service?.images?.length ?? 0) > 0 && images.length === 0 && (
+        {existingImages.length > 0 && images.length === 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">Imágenes actuales</p>
+            <p className="text-xs text-muted-foreground">
+              Imágenes actuales ({existingImages.length}). La primera es la portada actual.
+            </p>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {(service?.images ?? []).map((img) => (
+              {existingImages.map((img, index) => (
                 <div
                   key={img.id}
-                  className="aspect-square overflow-hidden rounded-lg border bg-muted"
+                  className="group relative aspect-square overflow-hidden rounded-lg border bg-muted"
                 >
                   <img
                     src={img.url}
                     alt="Servicio"
                     className="h-full w-full object-cover"
                   />
+
+                  {index === 0 && (
+                    <Badge className="absolute left-2 top-2 border border-yellow-300 bg-yellow-100 text-yellow-800">
+                      Portada
+                    </Badge>
+                  )}
+
+                  {index !== 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          console.log("CLICK PORTADA EXISTENTE:", img.id)
+                          makeExistingImageCover(img.id)
+                        }}
+                        className="absolute right-2 top-2 rounded-md bg-black/70 px-2 py-1 text-[10px] text-white transition hover:bg-black"
+                      >
+                        Portada
+                      </button>
+                    )}
                 </div>
               ))}
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Si quieres cambiarlas, selecciona nuevas y vuelve a subir.
+              Si quieres reemplazarlas, selecciona nuevas imágenes, ordénalas y vuelve a subir.
             </p>
           </div>
         )}
@@ -418,6 +540,9 @@ export default function AdminServicesPage() {
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Crear servicio</DialogTitle>
+                  <DialogDescription>
+                    Agrega la información del servicio, sus imágenes y elige cuál será la portada.
+                  </DialogDescription>
               </DialogHeader>
 
               <ServiceForm
@@ -524,6 +649,9 @@ export default function AdminServicesPage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Editar servicio</DialogTitle>
+              <DialogDescription>
+                Actualiza la información del servicio y define la imagen de portada.
+              </DialogDescription>
           </DialogHeader>
 
           {editingService && (

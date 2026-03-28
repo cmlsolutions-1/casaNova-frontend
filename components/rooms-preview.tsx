@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Bed, Users, Eye } from "lucide-react";
 import { formatCurrencyCOP } from "@/utils/format"
+import { AutoImageCarousel } from "@/components/auto-image-carousel"
 
 const ROOM_TYPE_ORDER: RoomType[] = [
   "SIMPLE",
@@ -74,7 +75,7 @@ export function RoomsPreview() {
             Nuestras Habitaciones
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
-            Cada habitacion ha sido diseñada con atencion al detalle para
+            Cada habitacion ha sido diseñada con atención al detalle para
             ofrecer el maximo confort y elegancia.
           </p>
         </div>
@@ -91,16 +92,19 @@ export function RoomsPreview() {
 
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
           {featured.map((room) => {
-            const img = room.images?.[0]?.url || "/placeholder.svg"
-
             return (
               <div key={room.id} className="group overflow-hidden rounded-2xl bg-card shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
                 <div className="relative h-56 overflow-hidden">
-                  <img
-                    src={img}
-                    alt={`Habitación ${room.nameRoom}`}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
+                  <div className="h-full w-full transition-transform duration-500 group-hover:scale-110">
+                    <AutoImageCarousel
+                      images={room.images}
+                      alt={`Habitación ${room.nameRoom}`}
+                      fallback="/placeholder.svg"
+                      interval={3200}
+                      showDots={(room.images?.length ?? 0) > 1}
+                      className="h-full w-full"
+                    />
+                  </div>
                 </div>
 
                 <div className="p-5">

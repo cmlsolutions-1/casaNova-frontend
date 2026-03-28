@@ -29,6 +29,7 @@ import { Plus, Pencil, Users, BedDouble, BedSingle, Upload, X, Loader2 } from "l
 
 import { uploadMediaService } from "@/services/media.service"
 import { formatCurrencyCOP } from "@/utils/format"
+import { Textarea } from "@/components/ui/textarea"
 
 const TYPE_LABEL: Record<RoomType, string> = {
   SIMPLE: "Sencilla",
@@ -47,6 +48,22 @@ function roomImageByType(type: RoomType) {
   return "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&h=600&fit=crop"
 }
 
+const MAX_ROOM_IMAGES = 6
+
+function moveItemToFront<T extends { id: string }>(items: T[], id: string): T[] {
+  const index = items.findIndex((item) => item.id === id)
+  if (index <= 0) return items
+
+  const selected = items[index]
+  return [selected, ...items.filter((_, i) => i !== index)]
+}
+
+function moveArrayIndexToFront<T>(items: T[], index: number): T[] {
+  if (index <= 0 || index >= items.length) return items
+  const selected = items[index]
+  return [selected, ...items.filter((_, i) => i !== index)]
+}
+
 function RoomForm({
   room,
   onSave,
@@ -63,6 +80,26 @@ function RoomForm({
   const [images, setImages] = useState<LocalImage[]>([])
   const [uploadedImageIds, setUploadedImageIds] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
+  const [existingImages, setExistingImages] = useState(room?.images ?? [])
+
+  const makeLocalImageCover = (id: string) => {
+  const index = images.findIndex((img) => img.id === id)
+    if (index <= 0) return
+
+    setImages((prev) => moveItemToFront(prev, id))
+
+    if (uploadedImageIds.length === images.length) {
+      setUploadedImageIds((prev) => moveArrayIndexToFront(prev, index))
+    } else {
+      // si el usuario reordena después de subir, lo más seguro es mantener el orden de ids
+      // solo si coincide la cantidad; si no, se invalida
+      setUploadedImageIds([])
+    }
+  }
+
+  const makeExistingImageCover = (id: string) => {
+    setExistingImages((prev) => moveItemToFront(prev, id))
+  }
 
   const formatCOPNumber = (value: number | string) => {
     const numeric =
@@ -133,6 +170,9 @@ function RoomForm({
       amenityIds: room.amenities?.map((a) => a.id) ?? [],
       imagesIds: [],
     })
+    setExistingImages(room.images ?? [])
+    setImages([])
+    setUploadedImageIds([])
   }, [room])
 
   useEffect(() => {
@@ -149,14 +189,31 @@ function RoomForm({
 
   const handlePickFiles = (filesList: FileList | null) => {
   if (!filesList) return
-  const next: LocalImage[] = []
 
-  Array.from(filesList).forEach((file) => {
-    if (!file.type.startsWith("image/")) return
-    const id = Math.random().toString(36).slice(2)
-    const preview = URL.createObjectURL(file)
-    next.push({ id, file, preview })
-  })
+  const availableSlots = MAX_ROOM_IMAGES - images.length
+
+  if (availableSlots <= 0) {
+    setError(`Solo puedes cargar máximo ${MAX_ROOM_IMAGES} imágenes.`)
+    return
+  }
+
+  const validImages = Array.from(filesList).filter((file) =>
+    file.type.startsWith("image/")
+  )
+
+  const filesToAdd = validImages.slice(0, availableSlots)
+
+  if (filesToAdd.length < validImages.length) {
+    setError(`Solo puedes cargar máximo ${MAX_ROOM_IMAGES} imágenes.`)
+  } else {
+    setError(null)
+  }
+
+  const next: LocalImage[] = filesToAdd.map((file) => ({
+    id: Math.random().toString(36).slice(2),
+    file,
+    preview: URL.createObjectURL(file),
+  }))
 
   if (next.length === 0) return
 
@@ -204,7 +261,7 @@ const uploadSelectedImages = async () => {
       throw new Error("Debes subir las imágenes antes de crear la habitación.")
     }
 
-    const existingImageIds = (room?.images ?? []).map((img) => img.id)
+    const existingImageIds = existingImages.map((img) => img.id)
 
     const imagesIdsToSend = room?.id
       ? uploadedImageIds.length > 0
@@ -247,16 +304,6 @@ const uploadSelectedImages = async () => {
         </div>
 
         <div className="space-y-2">
-          <Label className="text-foreground">Descripción</Label>
-          <Input
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder="Ej: Habitación con vista al mar"
-            required
-          />
-        </div>
-
-        <div className="space-y-2">
           <Label className="text-foreground">Tipo</Label>
           <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as RoomType })}>
             <SelectTrigger>
@@ -273,6 +320,18 @@ const uploadSelectedImages = async () => {
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-foreground">Descripción</Label>
+        <Textarea
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder="Ej: Habitación con vista al mar"
+          rows={4}
+          className="min-h-[110px] resize-none"
+          required
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -297,7 +356,7 @@ const uploadSelectedImages = async () => {
         </div>
 
         <div className="space-y-2">
-          <Label className="text-foreground">Cabaña</Label>
+          <Label className="text-foreground">Camarote</Label>
           <Input
             type="number"
             min={0}
@@ -390,8 +449,13 @@ const uploadSelectedImages = async () => {
         )}
       </div>
 
-      <div className="space-y-2">
-        <Label className="text-foreground">Imágenes</Label>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-foreground">Imágenes</Label>
+          <span className="text-xs text-muted-foreground">
+            Máximo {MAX_ROOM_IMAGES} imágenes. La primera será la portada.
+          </span>
+        </div>
 
         <input
           ref={fileInputRef}
@@ -418,61 +482,107 @@ const uploadSelectedImages = async () => {
           </Button>
 
           <Badge variant="outline" className="text-xs">
+            Seleccionadas: {images.length}/{MAX_ROOM_IMAGES}
+          </Badge>
+
+          <Badge variant="outline" className="text-xs">
             {uploadedImageIds.length > 0 ? `Subidas: ${uploadedImageIds.length}` : "Aún no subidas"}
           </Badge>
         </div>
 
         {images.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Las imágenes nuevas reemplazarán las actuales. Puedes elegir cuál será la portada.
+          </p>
+        )}
+
+        {images.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">Seleccionadas ({images.length})</p>
+            <p className="text-xs text-muted-foreground">Nuevas imágenes ({images.length})</p>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {images.map((img) => (
-                <div key={img.id} className="group relative aspect-square overflow-hidden rounded-lg border bg-muted">
+              {images.map((img, index) => (
+                <div
+                  key={img.id}
+                  className="group relative aspect-square overflow-hidden rounded-lg border bg-muted"
+                >
                   <img src={img.preview} alt={img.file.name} className="h-full w-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => removeLocalImage(img.id)}
-                    className="absolute right-2 top-2 rounded-full bg-destructive p-1.5 text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
-                    aria-label="Eliminar imagen"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+
+                  {index === 0 && (
+                    <Badge className="absolute left-2 top-2 border border-yellow-300 bg-yellow-100 text-yellow-800">
+                      Portada
+                    </Badge>
+                  )}
+
+                  <div className="absolute right-2 top-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => makeLocalImageCover(img.id)}
+                      className="rounded-md bg-black/70 px-2 py-1 text-[10px] text-white transition hover:bg-black"
+                    >
+                      Portada
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => removeLocalImage(img.id)}
+                      className="rounded-full bg-destructive p-1.5 text-destructive-foreground opacity-100 transition-opacity sm:opacity-0 group-hover:opacity-100"
+                      aria-label="Eliminar imagen"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
                     <p className="truncate text-xs text-white">{img.file.name}</p>
                   </div>
                 </div>
               ))}
             </div>
-            
           </div>
         )}
-      </div>
-        {/* Imágenes actuales (solo si editas y NO seleccionaste nuevas) */}
-        {(room?.images?.length ?? 0) > 0 && images.length === 0 && (
+
+        {existingImages.length > 0 && images.length === 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">Imágenes actuales</p>
+            <p className="text-xs text-muted-foreground">
+              Imágenes actuales ({existingImages.length}). La primera es la portada actual.
+            </p>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {(room?.images ?? []).map((img) => (
+              {existingImages.map((img, index) => (
                 <div
                   key={img.id}
-                  className="aspect-square overflow-hidden rounded-lg border bg-muted"
+                  className="group relative aspect-square overflow-hidden rounded-lg border bg-muted"
                 >
                   <img
                     src={img.url}
                     alt="Habitación"
                     className="h-full w-full object-cover"
                   />
+
+                  {index === 0 && (
+                    <Badge className="absolute left-2 top-2 border border-yellow-300 bg-yellow-100 text-yellow-800">
+                      Portada
+                    </Badge>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => makeExistingImageCover(img.id)}
+                    className="absolute right-2 top-2 rounded-md bg-black/70 px-2 py-1 text-[10px] text-white transition hover:bg-black"
+                  >
+                    Portada
+                  </button>
                 </div>
               ))}
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Si quieres cambiarlas, selecciona nuevas y vuelve a subir.
+              Si quieres cambiarlas, selecciona nuevas imágenes, ordénalas y vuelve a subir.
             </p>
           </div>
         )}
+      </div>
 
 
       <div className="flex items-center gap-2 pt-1">
@@ -651,7 +761,7 @@ export default function AdminRoomsPage() {
 
                   {(room.cabin ?? 0) > 0 && (
                     <Badge variant="outline" className="text-xs">
-                      Cabaña: {room.cabin}
+                      Camarote: {room.cabin}
                     </Badge>
                   )}
                   {(room.extraDouble ?? 0) > 0 && (

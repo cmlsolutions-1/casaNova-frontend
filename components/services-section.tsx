@@ -5,6 +5,8 @@ import React, { useEffect, useMemo, useState } from "react"
 import { Sparkles, Coffee, Car, Map, Clock, Wine } from "lucide-react"
 
 import { listServicesPublicService, type BackendService } from "@/services/service.service"
+import { formatCurrencyCOP } from "@/utils/format"
+import { AutoImageCarousel } from "@/components/auto-image-carousel"
 
 const iconMap: Record<string, React.ElementType> = {
   Sparkles,
@@ -60,7 +62,7 @@ export function ServicesSection() {
             Servicios Adicionales
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
-            Disfrute de una gama completa de servicios disenados para hacer de su
+            Disfrute de una gama completa de servicios diseñados para hacer de su
             estancia una experiencia inolvidable agregados a tu reserva.
           </p>
         </div>
@@ -75,26 +77,31 @@ export function ServicesSection() {
             // Si luego agregas `icon` al backend, aquí lo lees.
             const Icon = Sparkles
 
-           
-            const img = (service as any)?.images?.[0]?.url || "/LOGO.PNG"
-
             return (
               <div
                 key={service.id}
                 className="group relative overflow-hidden rounded-2xl bg-card shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
               >
                 <div className="relative h-48 overflow-hidden">
-                  <img
-                    src={img}
-                    alt={service.name}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
+                  <div className="h-full w-full transition-transform duration-500 group-hover:scale-110">
+                    <AutoImageCarousel
+                      images={service.images}
+                      alt={service.name}
+                      fallback="/LOGO.PNG"
+                      interval={3400}
+                      showDots={(service.images?.length ?? 0) > 1}
+                      className="h-full w-full"
+                    />
+                  </div>
+
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                   <div className="absolute bottom-4 left-4 flex items-center gap-2">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent">
                       <Icon className="h-5 w-5 text-accent-foreground" />
                     </div>
-                    <span className="text-lg font-bold text-white">${service.price} COP</span>
+                    <span className="text-lg font-bold text-white">
+                      Desde {formatCurrencyCOP(service.price)} COP
+                    </span>
                   </div>
                 </div>
 
