@@ -94,14 +94,14 @@ export function ServicesSection() {
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent">
                       <Icon className="h-5 w-5 text-accent-foreground" />
                     </div>
-                    <span className="text-lg font-bold text-white">${service.price} USD</span>
+                    <span className="text-lg font-bold text-white">${service.price} COP</span>
                   </div>
                 </div>
 
                 <div className="p-5">
                   <h3 className="text-lg font-bold text-card-foreground">{service.name}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    {service.description}
+                    {service.decription}
                   </p>
                 </div>
               </div>

@@ -36,7 +36,7 @@ export type ServiceUpsertBody = {
   price: number
   billingType: ServiceBillingType
   type: ServiceType
-  imagesIds: string[]
+  imagesIds?: string[]
 }
 
 export async function listServicesService() {

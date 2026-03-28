@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 import { Plus, Pencil, Upload, X, Loader2 } from "lucide-react"
+import { formatCurrencyCOP } from "@/utils/format"
 
 function normalizeService(s: any): BackendService {
   return {
@@ -44,7 +45,7 @@ type LocalImage = {
 
 function ImagePlaceholder() {
   return (
-    <div className="h-full w-full flex items-center justify-center bg-muted text-muted-foreground text-xs">
+    <div className="flex h-full w-full items-center justify-center bg-muted text-xs text-muted-foreground">
       Sin imagen
     </div>
   )
@@ -65,10 +66,9 @@ function ServiceForm({
   const [description, setDescription] = useState(service?.description ?? "")
   const [price, setPrice] = useState(service?.price ?? 50)
   const [billingType, setBillingType] = useState<ServiceBillingType>(service?.billingType ?? "FIXED")
+  const [type, setType] = useState<"STAY" | "DAY_PASS">(service?.type ?? "STAY")
 
-  // Imágenes seleccionadas (local preview)
   const [images, setImages] = useState<LocalImage[]>([])
-  // ids generados por /api/media/uploads
   const [uploadedImageIds, setUploadedImageIds] = useState<string[]>([])
 
   const [uploading, setUploading] = useState(false)
@@ -77,41 +77,40 @@ function ServiceForm({
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Para validar: si editas, ya hay imágenes existentes
   const hasExistingImages = (service?.images?.length ?? 0) > 0
   const hasUploadedIds = uploadedImageIds.length > 0
 
-  const [type, setType] = useState<"STAY" | "DAY_PASS">(service?.type ?? "STAY")
-
-  // Regla: NO se puede guardar si:
-  // - creando: no hay uploaded ids
-  // - editando: si NO hay uploaded ids Y tampoco hay imágenes existentes
   const canSubmit = useMemo(() => {
     if (!isEdit) return hasUploadedIds
     return hasUploadedIds || hasExistingImages
   }, [isEdit, hasUploadedIds, hasExistingImages])
 
-  // Reset al cambiar service (abrir modal editar / crear)
   useEffect(() => {
     setName(service?.name ?? "")
     setDescription(service?.description ?? service?.decription ?? "")
     setPrice(service?.price ?? 50)
     setBillingType(service?.billingType ?? "FIXED")
+    setType(service?.type ?? "STAY")
 
-    // Limpia selección nueva (local)
     images.forEach((img) => URL.revokeObjectURL(img.preview))
     setImages([])
-
-    // Importante: cuando editas, NO tienes ids de imágenes existentes (el backend solo da urls)
-    // así que arrancamos uploaded ids vacío; si quieres cambiar imágenes, subes nuevas.
     setUploadedImageIds([])
 
     setError(null)
     setUploading(false)
     setSaving(false)
-    setType(service?.type ?? "STAY")
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [service?.id])
+
+  const formatCOPNumber = (value: number | string) => {
+    const numeric =
+      typeof value === "number"
+        ? value
+        : Number(String(value).replace(/\D/g, ""))
+
+    if (!numeric) return ""
+    return new Intl.NumberFormat("es-CO").format(numeric)
+  }
 
   const handlePickFiles = (files: FileList | null) => {
     if (!files) return
@@ -126,7 +125,6 @@ function ServiceForm({
 
     if (next.length === 0) return
 
-    // Si seleccionas nuevas imágenes, invalida ids anteriores
     setUploadedImageIds([])
     setImages((prev) => [...prev, ...next])
   }
@@ -137,7 +135,6 @@ function ServiceForm({
       if (target) URL.revokeObjectURL(target.preview)
       return prev.filter((x) => x.id !== id)
     })
-    // si quitas imágenes después de haber subido, lo más seguro es invalidar ids
     setUploadedImageIds([])
   }
 
@@ -165,43 +162,45 @@ function ServiceForm({
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
+  e.preventDefault()
+  setSaving(true)
+  setError(null)
 
-    try {
-      if (!canSubmit) {
-        throw new Error("Debes subir las imágenes antes de guardar el servicio.")
-      }
+  try {
+    if (!canSubmit) {
+      throw new Error("Debes subir las imágenes antes de guardar el servicio.")
+    }
 
-      const imagesIdsToSend = uploadedImageIds
+    const existingImageIds = (service?.images ?? []).map((img) => img.id)
 
-      console.log("uploadedImageIds al hacer submit:", uploadedImageIds)
-      console.log("BODY QUE SE ENVÍA:", {
+    const imagesIdsToSend = isEdit
+      ? uploadedImageIds.length > 0
+        ? uploadedImageIds
+        : existingImageIds
+      : uploadedImageIds
+
+    const body: ServiceUpsertBody = {
       name,
       description,
       price,
       billingType,
-      imagesIds: imagesIdsToSend,
       type,
-    })
-
-      await onSave({
-        name,
-        description,
-        price,
-        billingType,
-        imagesIds: imagesIdsToSend,
-        type,
-      })
-
-      onClose()
-    } catch (e: any) {
-      setError(e?.message ?? "Error guardando servicio")
-    } finally {
-      setSaving(false)
+      imagesIds: imagesIdsToSend,
     }
+
+    console.log("existingImageIds:", existingImageIds)
+    console.log("uploadedImageIds al hacer submit:", uploadedImageIds)
+    console.log("imagesIdsToSend:", imagesIdsToSend)
+    console.log("BODY QUE SE ENVÍA:", body)
+
+    await onSave(body)
+    onClose()
+  } catch (e: any) {
+    setError(e?.message ?? "Error guardando servicio")
+  } finally {
+    setSaving(false)
   }
+}
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
@@ -231,24 +230,33 @@ function ServiceForm({
       </div>
 
       <div className="space-y-2">
-      <Label>Tipo de servicio</Label>
-      <Select value={type} onValueChange={(v) => setType(v as "STAY" | "DAY_PASS")}>
-        <SelectTrigger>
-          <SelectValue placeholder="Selecciona..." />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="STAY">ALOJAMIENTO</SelectItem>
-          <SelectItem value="DAY_PASS">PASADIA O SALON</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-
-      <div className="space-y-2">
-        <Label>Precio ($)</Label>
-        <Input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} required />
+        <Label>Tipo de servicio</Label>
+        <Select value={type} onValueChange={(v) => setType(v as "STAY" | "DAY_PASS")}>
+          <SelectTrigger>
+            <SelectValue placeholder="Selecciona..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="STAY">ALOJAMIENTO</SelectItem>
+            <SelectItem value="DAY_PASS">PASADÍA O SALÓN</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Imágenes */}
+      <div className="space-y-2">
+        <Label>Precio (COP)</Label>
+        <Input
+          type="text"
+          inputMode="numeric"
+          value={formatCOPNumber(price)}
+          onChange={(e) => {
+            const raw = e.target.value.replace(/\D/g, "")
+            setPrice(raw ? Number(raw) : 0)
+          }}
+          placeholder="100.000"
+          required
+        />
+      </div>
+
       <div className="space-y-2">
         <Label>Imágenes</Label>
 
@@ -283,7 +291,12 @@ function ServiceForm({
           </Badge>
         </div>
 
-        {/* Preview nuevas (local) */}
+        {isEdit && uploadedImageIds.length === 0 && hasExistingImages && (
+          <p className="text-xs text-muted-foreground">
+            Si no subes nuevas imágenes, se conservarán las actuales.
+          </p>
+        )}
+
         {images.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">Seleccionadas ({images.length})</p>
@@ -294,7 +307,7 @@ function ServiceForm({
                   <button
                     type="button"
                     onClick={() => removeLocalImage(img.id)}
-                    className="absolute right-2 top-2 rounded-full bg-destructive p-1.5 text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                    className="absolute right-2 top-2 rounded-full bg-destructive p-1.5 text-destructive-foreground opacity-100 transition-opacity sm:opacity-0 group-hover:opacity-100"
                     aria-label="Eliminar imagen"
                   >
                     <X className="h-4 w-4" />
@@ -308,7 +321,6 @@ function ServiceForm({
           </div>
         )}
 
-        {/* Preview existentes (solo si editas y NO seleccionaste nuevas) */}
         {(service?.images?.length ?? 0) > 0 && images.length === 0 && (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">Imágenes actuales</p>
@@ -388,7 +400,6 @@ export default function AdminServicesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-serif text-3xl font-bold">Servicios</h1>
@@ -424,7 +435,6 @@ export default function AdminServicesPage() {
       {loading && <p>Cargando...</p>}
       {error && <p className="text-red-500">{error}</p>}
 
-      {/* Grid */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {services.map((svc) => {
           const isActive = svc.status === "ACTIVE"
@@ -432,7 +442,6 @@ export default function AdminServicesPage() {
 
           return (
             <Card key={svc.id} className="overflow-hidden border-border">
-              {/* Image */}
               <div className="relative h-36 bg-muted">
                 {img ? (
                   <img src={img} alt={svc.name} className="h-full w-full object-cover" />
@@ -441,37 +450,38 @@ export default function AdminServicesPage() {
                 )}
 
                 <Badge
-                  className={`absolute top-2 right-2 ${
+                  className={`absolute right-2 top-2 ${
                     isActive
-                      ? "bg-green-100 text-green-700 border border-green-300"
-                      : "bg-red-100 text-red-700 border border-red-300"
+                      ? "border border-green-300 bg-green-100 text-green-700"
+                      : "border border-red-300 bg-red-100 text-red-700"
                   }`}
                 >
                   {isActive ? "Activo" : "Inactivo"}
                 </Badge>
               </div>
 
-              {/* Content */}
-              <CardContent className="p-4 space-y-2">
+              <CardContent className="space-y-2 p-4">
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline" className="text-xs">
                     {svc.billingType === "HOURLY" ? "Por hora" : "Fijo"}
                   </Badge>
 
                   <Badge variant="secondary" className="text-xs">
-                    {svc.type}
+                    {svc.type === "STAY" ? "Alojamiento" : "Pasadía / Salón"}
                   </Badge>
                 </div>
 
-                <div className="flex justify-between items-center">
+                <div className="flex items-center justify-between gap-3">
                   <h3 className="font-semibold">{svc.name}</h3>
-                  <span className="font-bold text-accent">${svc.price}</span>
+                  <span className="whitespace-nowrap font-bold text-accent">
+                    {formatCurrencyCOP(svc.price)}
+                  </span>
                 </div>
 
-                <p className="text-xs text-muted-foreground line-clamp-2">{svc.description}</p>
+                <p className="line-clamp-2 text-xs text-muted-foreground">{svc.description}</p>
 
                 {canManage && (
-                  <div className="mt-3 flex justify-center gap-2 flex-wrap">
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
                     <Button
                       size="sm"
                       variant="outline"
@@ -510,7 +520,6 @@ export default function AdminServicesPage() {
         })}
       </div>
 
-      {/* Edit Dialog */}
       <Dialog open={!!editingService} onOpenChange={(open) => !open && setEditingService(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>

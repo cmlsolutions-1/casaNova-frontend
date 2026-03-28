@@ -28,6 +28,7 @@ import { Switch } from "@/components/ui/switch"
 import { Plus, Pencil, Users, BedDouble, BedSingle, Upload, X, Loader2 } from "lucide-react"
 
 import { uploadMediaService } from "@/services/media.service"
+import { formatCurrencyCOP } from "@/utils/format"
 
 const TYPE_LABEL: Record<RoomType, string> = {
   SIMPLE: "Sencilla",
@@ -62,6 +63,16 @@ function RoomForm({
   const [images, setImages] = useState<LocalImage[]>([])
   const [uploadedImageIds, setUploadedImageIds] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
+
+  const formatCOPNumber = (value: number | string) => {
+    const numeric =
+      typeof value === "number"
+        ? value
+        : Number(String(value).replace(/\D/g, ""))
+
+    if (!numeric) return ""
+    return new Intl.NumberFormat("es-CO").format(numeric)
+  }
 
 
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -189,16 +200,29 @@ const uploadSelectedImages = async () => {
   setError(null)
 
   try {
-    // si quieres obligar imágenes al crear:
     if (!room?.id && uploadedImageIds.length === 0) {
       throw new Error("Debes subir las imágenes antes de crear la habitación.")
     }
 
-    await onSave({
-      ...form,
-      imagesIds: uploadedImageIds,
-    })
+    const existingImageIds = (room?.images ?? []).map((img) => img.id)
 
+    const imagesIdsToSend = room?.id
+      ? uploadedImageIds.length > 0
+        ? uploadedImageIds
+        : existingImageIds
+      : uploadedImageIds
+
+    const body: RoomUpsertBody = {
+      ...form,
+      imagesIds: imagesIdsToSend,
+    }
+
+    console.log("existingImageIds:", existingImageIds)
+    console.log("uploadedImageIds:", uploadedImageIds)
+    console.log("imagesIdsToSend:", imagesIdsToSend)
+    console.log("BODY QUE SE ENVÍA:", body)
+
+    await onSave(body)
     onClose()
   } catch (e: any) {
     setError(e?.message ?? "Error guardando habitación")
@@ -307,10 +331,14 @@ const uploadSelectedImages = async () => {
         <div className="space-y-2">
           <Label className="text-foreground">Precio/noche ($)</Label>
           <Input
-            type="number"
-            min={1}
-            value={form.price}
-            onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+            type="text"
+            inputMode="numeric"
+            value={formatCOPNumber(form.price)}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/\D/g, "")
+              setForm({ ...form, price: raw ? Number(raw) : 0 })
+            }}
+            placeholder="100.000"
           />
         </div>
 
@@ -596,7 +624,7 @@ export default function AdminRoomsPage() {
                   </div>
 
                   <span className="text-lg font-bold text-accent whitespace-nowrap">
-                    ${room.price}
+                    {formatCurrencyCOP(room.price)}
                     <span className="text-xs text-muted-foreground">/noche</span>
                   </span>
                 </div>
