@@ -255,7 +255,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
               Hab. {room.nameRoom}
             </h1>
 
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground text-justify hyphens-auto">
               {room.description}
             </p>
 

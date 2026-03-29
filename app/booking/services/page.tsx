@@ -5,10 +5,12 @@ import React, { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useBooking } from "@/lib/booking-context"
 import { Button } from "@/components/ui/button"
-import { Sparkles, Minus, Plus, ArrowRight } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Sparkles, Minus, Plus, ArrowRight, Eye } from "lucide-react"
 import type { SelectedService } from "@/lib/mock-data"
 import { listServicesPublicService, type BackendService } from "@/services/service.service"
 import { formatCurrencyCOP } from "@/utils/format"
+import { AutoImageCarousel } from "@/components/auto-image-carousel"
 
 export default function BookingServicesPage() {
   const router = useRouter()
@@ -16,16 +18,18 @@ export default function BookingServicesPage() {
   const [services, setServices] = useState<BackendService[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Record<string, SelectedService>>({})
+  const [detailService, setDetailService] = useState<BackendService | null>(null)
+
   const { booking, setSelectedServices, hydrated } = useBooking()
 
   useEffect(() => {
     if (!hydrated) return
-  
+
     if (!booking.selectedRooms || booking.selectedRooms.length === 0) {
       router.push("/")
       return
     }
-  
+
     ;(async () => {
       try {
         setLoading(true)
@@ -70,12 +74,14 @@ export default function BookingServicesPage() {
     return sum + (svc ? svc.price * s.amount : 0)
   }, 0)
 
+  const detailSelected = detailService ? !!selected[detailService.id] : false
+
   return (
     <div>
-      <h1 className="font-serif text-2xl font-bold text-foreground md:text-3xl mb-2">
+      <h1 className="mb-2 font-serif text-2xl font-bold text-foreground md:text-3xl">
         Servicios Adicionales
       </h1>
-      <p className="text-muted-foreground mb-8">
+      <p className="mb-8 text-muted-foreground">
         Seleccione los servicios que desea agregar a su estancia. Todos son opcionales.
       </p>
 
@@ -84,70 +90,102 @@ export default function BookingServicesPage() {
       ) : activeServices.length === 0 ? (
         <p className="text-muted-foreground">No hay servicios disponibles en este momento.</p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {activeServices.map((service) => {
             const isSelected = !!selected[service.id]
-            const Icon = Sparkles // (backend no trae icono)
+            const Icon = Sparkles
 
             return (
               <div
                 key={service.id}
-                className={`rounded-2xl border-2 bg-card p-5 transition-all ${
-                  isSelected ? "border-accent shadow-lg shadow-accent/10" : "border-transparent shadow"
+                className={`overflow-hidden rounded-2xl border bg-card transition-all ${
+                  isSelected
+                    ? "border-accent shadow-lg shadow-accent/10"
+                    : "border-border shadow-sm hover:shadow-md"
                 }`}
               >
-                <div className="flex items-start gap-4">
-                  <div
-                    className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${
-                      isSelected ? "bg-accent" : "bg-secondary"
-                    }`}
-                  >
-                    <Icon className={`h-6 w-6 ${isSelected ? "text-accent-foreground" : "text-muted-foreground"}`} />
+                <div className="relative h-48 overflow-hidden">
+                  <AutoImageCarousel
+                    images={service.images}
+                    alt={service.name}
+                    fallback="/LOGO.PNG"
+                    interval={3200}
+                    showDots={(service.images?.length ?? 0) > 1}
+                    className="h-full w-full"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                  <div className="absolute bottom-4 left-4 flex items-center gap-2">
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                        isSelected ? "bg-accent" : "bg-white/90"
+                      }`}
+                    >
+                      <Icon
+                        className={`h-5 w-5 ${
+                          isSelected ? "text-accent-foreground" : "text-foreground"
+                        }`}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="text-base font-bold text-card-foreground">{service.name}</h3>
+                    <span className="whitespace-nowrap font-bold text-foreground">
+                      {formatCurrencyCOP(service.price)}
+                    </span>
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-base font-bold text-card-foreground">{service.name}</h3>
-                      <span className="font-bold text-foreground whitespace-nowrap">
-                        {formatCurrencyCOP(service.price)}
-                      </span>
-                    </div>
+                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                    {service.description ?? service.decription ?? ""}
+                  </p>
 
-                    <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-                      {service.description ?? (service as any).decription ?? ""}
-                    </p>
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <Button
+                      variant={isSelected ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => toggleService(service.id)}
+                      className={
+                        isSelected
+                          ? "rounded-lg bg-accent text-accent-foreground hover:bg-accent/90"
+                          : "rounded-lg"
+                      }
+                    >
+                      {isSelected ? "Agregado" : "Agregar"}
+                    </Button>
 
-                    <div className="mt-3 flex items-center gap-3">
-                      <Button
-                        variant={isSelected ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => toggleService(service.id)}
-                        className={isSelected ? "bg-accent text-accent-foreground hover:bg-accent/90 rounded-lg" : "rounded-lg"}
-                      >
-                        {isSelected ? "Agregado" : "Agregar"}
-                      </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDetailService(service)}
+                      className="rounded-lg"
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      Más info
+                    </Button>
 
-                      {isSelected && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => updateAmount(service.id, -1)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full border text-foreground hover:bg-secondary"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <span className="text-sm font-bold w-4 text-center">{selected[service.id].amount}</span>
-                          <button
-                            type="button"
-                            onClick={() => updateAmount(service.id, 1)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full border text-foreground hover:bg-secondary"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
+                    {isSelected && (
+                      <div className="ml-auto flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateAmount(service.id, -1)}
+                          className="flex h-8 w-8 items-center justify-center rounded-full border text-foreground hover:bg-secondary"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span className="w-5 text-center text-sm font-bold">
+                          {selected[service.id].amount}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateAmount(service.id, 1)}
+                          className="flex h-8 w-8 items-center justify-center rounded-full border text-foreground hover:bg-secondary"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -166,12 +204,95 @@ export default function BookingServicesPage() {
       <div className="mt-8 flex justify-end">
         <Button
           onClick={handleContinue}
-          className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl px-8 py-3 h-auto font-semibold"
+          className="h-auto rounded-xl bg-accent px-8 py-3 font-semibold text-accent-foreground hover:bg-accent/90"
         >
           Continuar
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
+
+      <Dialog open={!!detailService} onOpenChange={(open) => !open && setDetailService(null)}>
+        <DialogContent className="max-w-3xl">
+          {detailService && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-serif text-2xl">
+                  {detailService.name}
+                </DialogTitle>
+                <DialogDescription>
+                  Conoce más detalles del servicio antes de agregarlo a tu reserva.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="overflow-hidden rounded-2xl border bg-muted">
+                  <div className="h-72">
+                    <AutoImageCarousel
+                      images={detailService.images}
+                      alt={detailService.name}
+                      fallback="/LOGO.PNG"
+                      interval={3400}
+                      showDots={(detailService.images?.length ?? 0) > 1}
+                      className="h-full w-full"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <span className="rounded-full bg-accent/10 px-3 py-1 text-sm font-medium text-accent">
+                      {detailService.type === "STAY" ? "Servicio de alojamiento" : "Servicio especial"}
+                    </span>
+                    <span className="text-xl font-bold text-foreground">
+                      {formatCurrencyCOP(detailService.price)}
+                    </span>
+                  </div>
+
+                  <p className="text-sm leading-relaxed text-muted-foreground text-justify">
+                    {detailService.description ?? detailService.decription ?? "Sin descripción disponible."}
+                  </p>
+
+                  <div className="mt-6 flex items-center gap-3">
+                    <Button
+                      variant={detailSelected ? "default" : "outline"}
+                      onClick={() => toggleService(detailService.id)}
+                      className={
+                        detailSelected
+                          ? "bg-accent text-accent-foreground hover:bg-accent/90"
+                          : ""
+                      }
+                    >
+                      {detailSelected ? "Agregado" : "Agregar servicio"}
+                    </Button>
+
+                    {detailSelected && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateAmount(detailService.id, -1)}
+                          className="flex h-8 w-8 items-center justify-center rounded-full border text-foreground hover:bg-secondary"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span className="w-6 text-center text-sm font-bold">
+                          {selected[detailService.id].amount}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateAmount(detailService.id, 1)}
+                          className="flex h-8 w-8 items-center justify-center rounded-full border text-foreground hover:bg-secondary"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
