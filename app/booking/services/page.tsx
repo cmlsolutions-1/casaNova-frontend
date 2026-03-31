@@ -2,7 +2,7 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useBooking } from "@/lib/booking-context"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -21,6 +21,9 @@ export default function BookingServicesPage() {
   const [detailService, setDetailService] = useState<BackendService | null>(null)
 
   const { booking, setSelectedServices, hydrated } = useBooking()
+
+  const searchParams = useSearchParams()
+  const returnTo = searchParams.get("returnTo") || ""
 
   useEffect(() => {
     if (!hydrated) return
@@ -65,9 +68,15 @@ export default function BookingServicesPage() {
   }
 
   const handleContinue = () => {
-    setSelectedServices(Object.values(selected))
-    setTimeout(() => router.push("/booking/guest"), 0)
-  }
+  setSelectedServices(Object.values(selected))
+  setTimeout(() => {
+    if (returnTo === "confirm") {
+      router.push("/booking/confirm")
+      return
+    }
+    router.push("/booking/guest")
+  }, 0)
+}
 
   const total = Object.values(selected).reduce((sum, s) => {
     const svc = services.find((sv) => sv.id === s.serviceId)

@@ -30,11 +30,13 @@ import { getRoomPublicService, type BackendRoom } from "@/services/room.service"
 function RoomDetailContent({ roomId }: { roomId: string }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { addSelectedRoom, booking, setSearchParams } = useBooking()
+  const { addSelectedRoom, replaceSelectedRooms, booking, setSearchParams } = useBooking()
 
   const [room, setRoom] = useState<BackendRoom | null>(null)
   const [loadingRoom, setLoadingRoom] = useState(true)
   const [imgIdx, setImgIdx] = useState(0)
+
+  const returnTo = searchParams.get("returnTo") || ""
 
   // Cargar habitación desde backend (PUBLICO)
   useEffect(() => {
@@ -106,9 +108,13 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
     // Calcula TODO como number (evita strings del storage)
     const requiredPeople = Number(adults) + Number(kids) + Number(babies)
 
-    const prevCapacity = (booking.selectedRooms ?? []).reduce((sum, r: any) => {
-      return sum + Number(r?.capacity ?? 0)
-    }, 0)
+    const isReplacing = returnTo === "confirm"
+
+    const prevCapacity = isReplacing
+      ? 0
+      : (booking.selectedRooms ?? []).reduce((sum, r: any) => {
+          return sum + Number(r?.capacity ?? 0)
+        }, 0)
 
     const thisCapacity = Number(room?.capacity ?? 0)
     const nextCapacity = prevCapacity + thisCapacity
@@ -124,9 +130,23 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
       selectedPricePerNight: roomPricePerNight,
     }
 
+    if (returnTo === "confirm") {
+      replaceSelectedRooms([roomWithPricing])
+
+      toast.success("Habitación actualizada", {
+        description: "Tu selección de habitación fue reemplazada correctamente.",
+        duration: 3000,
+      })
+
+      setTimeout(() => {
+        router.push("/booking/confirm")
+      }, 0)
+
+      return
+    }
+
     addSelectedRoom(roomWithPricing as any)
 
-    // 2) si faltan personas -> mensaje + volver a resultados
     if (remaining > 0) {
       toast.info("Aún faltan personas por acomodar", {
         description: `Seleccionaste una habitación para ${thisCapacity} persona${thisCapacity === 1 ? "" : "s"}. Te faltan ${remaining} por acomodar. Elige otra habitación para completar tu reserva.`,
@@ -134,18 +154,23 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
       })
 
       router.push(
-        `/search?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}&remaining=${remaining}`,
+        `/search?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}&remaining=${remaining}&returnTo=${returnTo}`,
       )
       return
     }
 
-  // 3) si ya completó capacidad -> servicios
-  toast.success("¡Perfecto!", {
-    description: "Ya acomodaste a todos los huéspedes. Ahora puedes agregar servicios adicionales.",
-    duration: 4000,
-  })
-  router.push("/booking/services")
-}
+    toast.success("¡Perfecto!", {
+      description: "Ya acomodaste a todos los huéspedes. Ahora puedes agregar servicios adicionales.",
+      duration: 4000,
+    })
+
+    setTimeout(() => {
+      router.push("/booking/services")
+    }, 0)
+  }
+
+
+
 
   if (loadingRoom) {
     return (
@@ -171,7 +196,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
       <Link
         href={
           start
-            ? `/search?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}`
+            ? `/search?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}&returnTo=${returnTo}`
             : "/"
         }
         className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors"

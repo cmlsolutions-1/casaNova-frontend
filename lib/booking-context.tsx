@@ -33,6 +33,7 @@ interface BookingState {
   guestInfo: GuestInfo | null
   consents: BookingConsents
   extraBooking: ExtraBookingSelection | null
+  expiresAt: string | null
 }
 
 interface AdminAuth {
@@ -58,11 +59,8 @@ interface BookingContextType {
   booking: BookingState
   adminAuth: AdminAuth
   hydrated: boolean
-
-  // expón rooms/services para que lo usen admin y UI
   rooms: BackendRoom[]
   services: BackendService[]
-
   reservations: Reservation[]
   payments: Payment[]
   users: User[]
@@ -90,9 +88,18 @@ interface BookingContextType {
 
   setExtraBooking: (data: ExtraBookingSelection) => void
   clearExtraBooking: () => void
+
+  startBookingSession: () => void
+  clearBookingSession: () => void
+  replaceSelectedRooms: (rooms: any[]) => void
+
+  
 }
 
+
 const BookingContext = createContext<BookingContextType | null>(null)
+
+
 
 const STORAGE_KEYS = {
   reservations: "hotel_reservations",
@@ -130,6 +137,7 @@ function normalizeBooking(raw: any): BookingState {
       acceptedMinorsPolicy: false,
     },
     extraBooking: raw.extraBooking ?? null,
+    expiresAt: raw.expiresAt ?? null,
   }
 
   if (!raw || typeof raw !== "object") return base
@@ -150,6 +158,7 @@ function normalizeBooking(raw: any): BookingState {
       acceptedMinorsPolicy: !!raw.consents?.acceptedMinorsPolicy,
     },
     extraBooking: raw.extraBooking ?? null,
+    expiresAt: raw.expiresAt ?? null,
   }
 }
 
@@ -163,6 +172,7 @@ const defaultBooking: BookingState = {
     acceptedMinorsPolicy: false,
   },
   extraBooking: null,
+  expiresAt: null,
 }
 
 export function BookingProvider({ children }: { children: React.ReactNode }) {
@@ -269,13 +279,51 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     saveToStorage(STORAGE_KEYS.booking, booking)
   }, [booking, hydrated])
 
+  // ===== AUTO EXPIRACIÓN DE RESERVA =====
+
+  useEffect(() => {
+    if (!hydrated) return
+    if (!booking.expiresAt) return
+
+    const expiresAtMs = new Date(booking.expiresAt).getTime()
+    const now = Date.now()
+
+    if (now >= expiresAtMs) {
+      setBooking(defaultBooking)
+      return
+    }
+
+    const timeout = setTimeout(() => {
+      setBooking(defaultBooking)
+    }, expiresAtMs - now)
+
+    return () => clearTimeout(timeout)
+  }, [booking.expiresAt, hydrated])
+
+
+
   useEffect(() => {
     if (!hydrated) return
     saveToStorage(STORAGE_KEYS.adminAuth, adminAuth)
   }, [adminAuth, hydrated])
 
+
+
   const setSearchParams = useCallback((params: SearchParams) => {
-    setBooking((prev) => ({ ...prev, searchParams: params }))
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+
+    setBooking({
+      searchParams: params,
+      selectedRooms: [],
+      selectedServices: [],
+      guestInfo: null,
+      consents: {
+        acceptedTerms: false,
+        acceptedMinorsPolicy: false,
+      },
+      extraBooking: null,
+      expiresAt,
+    })
   }, [])
 
   const addSelectedRoom = useCallback((room: any) => {
@@ -296,6 +344,29 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
 
   const clearSelectedRooms = useCallback(() => {
     setBooking((prev) => ({ ...prev, selectedRooms: [] }))
+  }, [])
+
+
+  // ===== NUEVAS FUNCIONES DE SESIÓN =====
+
+  const startBookingSession = useCallback(() => {
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+
+    setBooking((prev) => ({
+      ...prev,
+      expiresAt,
+    }))
+  }, [])
+
+  const clearBookingSession = useCallback(() => {
+    setBooking(defaultBooking)
+  }, [])
+
+  const replaceSelectedRooms = useCallback((rooms: any[]) => {
+    setBooking((prev) => ({
+      ...prev,
+      selectedRooms: rooms,
+    }))
   }, [])
 
   const setSelectedServices = useCallback((svc: SelectedService[]) => {
@@ -428,6 +499,9 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
         resetBookingConsents,
         setExtraBooking,
         clearExtraBooking,
+        startBookingSession,
+        clearBookingSession,
+        replaceSelectedRooms,
       }}
     >
       {children}

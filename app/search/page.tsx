@@ -33,6 +33,18 @@ function SearchResults() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [editingSearch, setEditingSearch] = useState(false)
+  const [localSearch, setLocalSearch] = useState({
+    start: start || "",
+    end: end || "",
+    adults: adults || 1,
+    kids: kids || 0,
+    babies: babies || 0,
+    pets: pets || 0,
+  })
+
+  const returnTo = searchParams.get("returnTo") || ""
+
   // Fechas bonitas
   const prettyRange = useMemo(() => {
     try {
@@ -98,19 +110,141 @@ function SearchResults() {
         Volver al inicio
       </Link>
 
-      <div className="mb-8">
-        <h1 className="font-serif text-3xl font-bold text-foreground md:text-4xl">
-          Resultados de Búsqueda
-        </h1>
+      <div className="mb-8 rounded-2xl border bg-card p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="font-serif text-2xl font-bold text-foreground md:text-3xl">
+            Resultados de Búsqueda
+          </h1>
 
-        <p className="mt-2 text-muted-foreground">
-          {prettyRange}
-          {" | "}
-          {adults} adulto{adults !== 1 ? "s" : ""}
-          {kids > 0 ? `, ${kids} niño${kids !== 1 ? "s" : ""}` : ""}
-          {babies > 0 ? `, ${babies} bebé${babies !== 1 ? "s" : ""}` : ""}
-          {pets > 0 ? `, ${pets} mascota${pets !== 1 ? "s" : ""}` : ""}
-        </p>
+          <button
+            onClick={() => setEditingSearch(!editingSearch)}
+            className="text-sm text-accent hover:underline"
+          >
+            {editingSearch ? "Cancelar" : "Modificar búsqueda"}
+          </button>
+        </div>
+
+        {!editingSearch ? (
+          <p className="text-muted-foreground">
+            {prettyRange}
+            {" | "}
+            {adults} adulto{adults !== 1 ? "s" : ""}
+            {kids > 0 ? `, ${kids} niño${kids !== 1 ? "s" : ""}` : ""}
+            {babies > 0 ? `, ${babies} bebé${babies !== 1 ? "s" : ""}` : ""}
+            {pets > 0 ? `, ${pets} mascota${pets !== 1 ? "s" : ""}` : ""}
+          </p>
+        ) : (
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
+            
+            {/* LLEGADA */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">Llegada</label>
+              <input
+                type="date"
+                value={localSearch.start}
+                onChange={(e) =>
+                  setLocalSearch((prev) => ({ ...prev, start: e.target.value }))
+                }
+                className="rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            {/* SALIDA */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">Salida</label>
+              <input
+                type="date"
+                value={localSearch.end}
+                onChange={(e) =>
+                  setLocalSearch((prev) => ({ ...prev, end: e.target.value }))
+                }
+                className="rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            {/* ADULTOS */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">Adultos</label>
+              <input
+                type="number"
+                min={1}
+                value={localSearch.adults}
+                onChange={(e) =>
+                  setLocalSearch((prev) => ({ ...prev, adults: Number(e.target.value) }))
+                }
+                className="rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            {/* NIÑOS */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">Niños</label>
+              <input
+                type="number"
+                min={0}
+                value={localSearch.kids}
+                onChange={(e) =>
+                  setLocalSearch((prev) => ({ ...prev, kids: Number(e.target.value) }))
+                }
+                className="rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            {/* BEBÉS */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">Bebés</label>
+              <input
+                type="number"
+                min={0}
+                value={localSearch.babies}
+                onChange={(e) =>
+                  setLocalSearch((prev) => ({ ...prev, babies: Number(e.target.value) }))
+                }
+                className="rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            {/* MASCOTAS */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">Mascotas</label>
+              <input
+                type="number"
+                min={0}
+                value={localSearch.pets}
+                onChange={(e) =>
+                  setLocalSearch((prev) => ({
+                    ...prev,
+                    pets: Number(e.target.value),
+                  }))
+                }
+                className="rounded-xl border px-3 py-2 text-sm"
+              />
+            </div>
+
+            {/* BOTÓN */}
+            <div className="flex items-end">
+              <Button
+                onClick={() => {
+                  const params = new URLSearchParams({
+                    start: localSearch.start,
+                    end: localSearch.end,
+                    adults: String(localSearch.adults),
+                    kids: String(localSearch.kids),
+                    babies: String(localSearch.babies),
+                    pets: String(localSearch.pets),
+                    remaining: "0",
+                    returnTo,
+                  })
+
+                  window.location.href = `/search?${params.toString()}`
+                }}
+                className="w-full rounded-xl bg-accent text-accent-foreground"
+              >
+                Buscar
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {loading && (
@@ -213,7 +347,7 @@ function SearchResults() {
                   </div>
 
                   <Link
-                    href={`/rooms/${room.id}?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}&remaining=${remaining}`}
+                    href={`/rooms/${room.id}?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}&remaining=${remaining}&returnTo=${returnTo}`}
                     className="mt-4 block"
                   >
                     <Button className="w-full rounded-xl bg-accent text-accent-foreground hover:bg-accent/90 font-semibold">
