@@ -71,6 +71,9 @@ export default function BookingConfirmPage() {
   const [loadingRooms, setLoadingRooms] = useState(false)
   const [roomPickerError, setRoomPickerError] = useState<string | null>(null)
 
+  const [tempSelectedRooms, setTempSelectedRooms] = useState<any[]>([])
+  
+
   const paymentLockRef = useRef(false)
 
   const isExtraBooking = !!extraBooking
@@ -79,6 +82,12 @@ export default function BookingConfirmPage() {
   useEffect(() => {
     setLocalSearch(sp)
   }, [sp])
+
+  useEffect(() => {
+    if (editingRooms) {
+      setTempSelectedRooms(selectedRooms ?? [])
+    }
+  }, [editingRooms, selectedRooms])
 
   useEffect(() => {
     paymentLockRef.current = false
@@ -147,13 +156,11 @@ export default function BookingConfirmPage() {
         setLoadingRooms(true)
         setRoomPickerError(null)
 
-        const totalPeople = Number(sp.adults ?? 0) + Number(sp.kids ?? 0) + Number(sp.babies ?? 0)
-
         const data = await listAvailableRoomsPublicService({
-          start: sp.startDate,
-          end: sp.endDate,
-          people: totalPeople,
-        })
+        start: sp.startDate,
+        end: sp.endDate,
+        people: 1,
+      })
 
         if (!alive) return
 
@@ -191,7 +198,7 @@ export default function BookingConfirmPage() {
 
   if (!hydrated) return null
 
-  if ((!sp && !hasExtraBooking) || !guestInfo || (!hasRooms && !hasExtraBooking)) {
+  if ((!sp && !hasExtraBooking) || !guestInfo) {
     return null
   }
 
@@ -252,22 +259,80 @@ export default function BookingConfirmPage() {
 
   const canProceedToPay = acceptedTerms && acceptedMinorsPolicy && !paying
 
-  const handleReplaceRoom = (room: BackendRoom) => {
-    if (!sp) return
+  const totalGuestsNeeded =
+  Number(sp?.adults ?? 0) + Number(sp?.kids ?? 0) + Number(sp?.babies ?? 0)
 
-    const selectedPeopleForThisRoom = Math.min(
-      Number(room.capacity ?? 0),
-      Number(sp.adults ?? 0) + Number(sp.kids ?? 0) + Number(sp.babies ?? 0),
-    )
+  const currentTempCapacity = tempSelectedRooms.reduce(
+    (sum, room) => sum + Number(room.capacity ?? 0),
+    0,
+  )
 
-    const roomWithPricing = {
-      ...room,
-      selectedPeople: selectedPeopleForThisRoom,
-      selectedPricePerNight: Number(room.price ?? 0) * selectedPeopleForThisRoom,
+  const handleToggleRoom = (room: BackendRoom) => {
+    const exists = tempSelectedRooms.some((r) => r.id === room.id)
+
+    if (exists) {
+      setTempSelectedRooms((prev) => prev.filter((r) => r.id !== room.id))
+      return
     }
 
-    replaceSelectedRooms([roomWithPricing])
+    setTempSelectedRooms((prev) => [
+      ...prev,
+      {
+        ...room,
+        selectedPeople: Number(room.capacity ?? 0),
+        selectedPricePerNight: Number(room.price ?? 0) * Number(room.capacity ?? 0),
+      },
+    ])
+  }
+
+    const handleConfirmRooms = () => {
+    if (!sp) return
+
+    const neededGuests =
+      Number(sp.adults ?? 0) + Number(sp.kids ?? 0) + Number(sp.babies ?? 0)
+
+    const capacity = tempSelectedRooms.reduce(
+      (sum, room) => sum + Number(room.capacity ?? 0),
+      0,
+    )
+
+    if (capacity < neededGuests) {
+      setRoomPickerError(
+        "La capacidad total de las habitaciones seleccionadas no alcanza para todos los huéspedes.",
+      )
+      return
+    }
+
+    let remainingAdults = Number(sp.adults ?? 0)
+    let remainingKids = Number(sp.kids ?? 0)
+    let remainingBabies = Number(sp.babies ?? 0)
+
+    const normalizedRooms = tempSelectedRooms.map((room) => {
+      const capacity = Number(room.capacity ?? 0)
+      let used = 0
+
+      const adultsHere = Math.min(remainingAdults, capacity - used)
+      used += adultsHere
+      remainingAdults -= adultsHere
+
+      const kidsHere = Math.min(remainingKids, capacity - used)
+      used += kidsHere
+      remainingKids -= kidsHere
+
+      const babiesHere = Math.min(remainingBabies, capacity - used)
+      used += babiesHere
+      remainingBabies -= babiesHere
+
+      return {
+        ...room,
+        selectedPeople: used,
+        selectedPricePerNight: Number(room.price ?? 0) * used,
+      }
+    })
+
+    replaceSelectedRooms(normalizedRooms)
     setEditingRooms(false)
+    setRoomPickerError(null)
   }
 
   const handleGoToMercadoPago = async () => {
@@ -483,6 +548,17 @@ export default function BookingConfirmPage() {
     }
   }
 
+  const guestFields: Array<{
+    key: "adults" | "kids" | "babies" | "pets"
+    label: string
+    min: number
+  }> = [
+    { key: "adults", label: "Adultos", min: 1 },
+    { key: "kids", label: "Niños", min: 0 },
+    { key: "babies", label: "Bebés", min: 0 },
+    { key: "pets", label: "Mascotas", min: 0 },
+  ]
+
   return (
     <div>
       {timeLeft > 0 && (
@@ -602,23 +678,67 @@ export default function BookingConfirmPage() {
                   />
                 </div>
 
+                  {guestFields.map((item) => (
+                    <div key={item.key}>
+                      <Label className="mb-1 block text-xs text-muted-foreground">{item.label}</Label>
+
+                      <div className="flex items-center rounded-xl border border-border">
+                        <button
+                          type="button"
+                          className="px-3 py-2"
+                          onClick={() =>
+                            setLocalSearch((prev: any) => ({
+                              ...prev,
+                              [item.key]: Math.max(item.min, Number(prev?.[item.key] ?? item.min) - 1),
+                            }))
+                          }
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+
+                        <div className="flex-1 text-center text-sm font-medium">
+                          {Number(localSearch?.[item.key] ?? item.min)}
+                        </div>
+
+                        <button
+                          type="button"
+                          className="px-3 py-2"
+                          onClick={() =>
+                            setLocalSearch((prev: any) => ({
+                              ...prev,
+                              [item.key]: Number(prev?.[item.key] ?? item.min) + 1,
+                            }))
+                          }
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  
+
                 <Button
                   type="button"
                   className="col-span-2 mt-2 rounded-xl bg-accent text-accent-foreground hover:bg-accent/90"
                   onClick={() => {
-                    if (!localSearch?.startDate || !localSearch?.endDate || !sp) return
+                    if (!localSearch?.startDate || !localSearch?.endDate) return
+
+                    const adults = Number(localSearch.adults ?? 1)
+                    const kids = Number(localSearch.kids ?? 0)
+                    const babies = Number(localSearch.babies ?? 0)
+                    const pets = Number(localSearch.pets ?? 0)
 
                     setSearchParams({
                       startDate: localSearch.startDate,
                       endDate: localSearch.endDate,
-                      adults: sp.adults,
-                      kids: sp.kids,
-                      babies: sp.babies,
-                      pets: sp.pets,
+                      adults,
+                      kids,
+                      babies,
+                      pets,
                     })
 
                     router.push(
-                      `/search?start=${localSearch.startDate}&end=${localSearch.endDate}&adults=${sp.adults}&kids=${sp.kids}&babies=${sp.babies}&pets=${sp.pets}&returnTo=confirm`,
+                      `/search?start=${localSearch.startDate}&end=${localSearch.endDate}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}&returnTo=confirm`,
                     )
                   }}
                 >
@@ -947,63 +1067,91 @@ export default function BookingConfirmPage() {
                 No hay habitaciones disponibles para las fechas seleccionadas.
               </p>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {availableRooms.map((room) => {
-                  const img = room.images?.[0]?.url || "/placeholder.svg"
-                  const peopleForThisRoom = Math.min(
-                    Number(room.capacity ?? 0),
-                    Number(sp?.adults ?? 0) + Number(sp?.kids ?? 0) + Number(sp?.babies ?? 0),
-                  )
-                  const roomPricePerNight = Number(room.price ?? 0) * peopleForThisRoom
+              <>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {availableRooms.map((room) => {
+                    const img = room.images?.[0]?.url || "/placeholder.svg"
+                    const peopleForThisRoom = Math.min(
+                      Number(room.capacity ?? 0),
+                      Number(sp?.adults ?? 0) + Number(sp?.kids ?? 0) + Number(sp?.babies ?? 0),
+                    )
+                    const roomPricePerNight = Number(room.price ?? 0) * peopleForThisRoom
+                    const isSelected = tempSelectedRooms.some((r) => r.id === room.id)
 
-                  return (
-                    <div
-                      key={room.id}
-                      className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-md"
-                    >
-                      <div className="h-44 overflow-hidden">
-                        <img
-                          src={img}
-                          alt={`Habitación ${room.nameRoom}`}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-
-                      <div className="p-4">
-                        <div className="mb-2 flex items-center justify-between gap-2">
-                          <span className="rounded-full bg-secondary px-2 py-1 text-xs capitalize text-foreground">
-                            {room.type}
-                          </span>
-                          <span className="text-sm font-bold text-foreground">
-                            {formatCurrencyCOP(roomPricePerNight)}
-                          </span>
+                    return (
+                      <div
+                        key={room.id}
+                        className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                      >
+                        <div className="h-44 overflow-hidden">
+                          <img
+                            src={img}
+                            alt={`Habitación ${room.nameRoom}`}
+                            className="h-full w-full object-cover"
+                          />
                         </div>
 
-                        <h3 className="text-base font-bold text-card-foreground">
-                          Hab. {room.nameRoom}
-                        </h3>
+                        <div className="p-4">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <span className="rounded-full bg-secondary px-2 py-1 text-xs capitalize text-foreground">
+                              {room.type}
+                            </span>
+                            <span className="text-sm font-bold text-foreground">
+                              {formatCurrencyCOP(roomPricePerNight)}
+                            </span>
+                          </div>
 
-                        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                          {room.description}
-                        </p>
+                          <h3 className="text-base font-bold text-card-foreground">
+                            Hab. {room.nameRoom}
+                          </h3>
 
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          Capacidad: {room.capacity} personas
-                        </p>
+                          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                            {room.description}
+                          </p>
 
-                        <Button
-                          type="button"
-                          onClick={() => handleReplaceRoom(room)}
-                          className="mt-4 w-full rounded-xl bg-accent text-accent-foreground hover:bg-accent/90"
-                        >
-                          Seleccionar esta habitación
-                        </Button>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Capacidad: {room.capacity} personas
+                          </p>
+
+                          <Button
+                            type="button"
+                            onClick={() => handleToggleRoom(room)}
+                            variant={isSelected ? "default" : "outline"}
+                            className="mt-4 w-full rounded-xl"
+                          >
+                            {isSelected ? "Quitar habitación" : "Agregar habitación"}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+                    )
+                  })}
+                </div>
+
+                <div className="mt-6 flex items-center justify-between gap-4 border-t border-border pt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Capacidad seleccionada:{" "}
+                    <span className="font-bold text-foreground">
+                      {tempSelectedRooms.reduce(
+                        (sum, room) => sum + Number(room.capacity ?? 0),
+                        0,
+                      )}
+                    </span>{" "}
+                    / {Number(sp?.adults ?? 0) + Number(sp?.kids ?? 0) + Number(sp?.babies ?? 0)} huéspedes
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={handleConfirmRooms}
+                    className="rounded-xl bg-accent text-accent-foreground hover:bg-accent/90"
+                  >
+                    Confirmar habitaciones
+                  </Button>
+                </div>
+              </>
+            )
+            
+            
+            }
           </div>
         </div>
       )}

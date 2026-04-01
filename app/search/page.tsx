@@ -17,7 +17,7 @@ import { es } from "date-fns/locale"
 
 function SearchResults() {
   const searchParams = useSearchParams()
-  const { booking } = useBooking()
+  const { booking, setSearchParams } = useBooking()
   const start = searchParams.get("start") || ""
   const end = searchParams.get("end") || ""
   const adults = Number(searchParams.get("adults")) || 1
@@ -56,9 +56,13 @@ function SearchResults() {
   }, [start, end])
 
   const selectedIds = useMemo(() => {
+    if (returnTo === "confirm") {
+      return new Set<string>()
+    }
+
     const list = booking.selectedRooms ?? []
-    return new Set(list.map((r: any) => String(r?.id)))
-  }, [booking.selectedRooms])
+      return new Set(list.map((r: any) => String(r?.id)))
+    }, [booking.selectedRooms, returnTo])
 
   useEffect(() => {
     let alive = true
@@ -225,6 +229,15 @@ function SearchResults() {
             <div className="flex items-end">
               <Button
                 onClick={() => {
+                  setSearchParams({
+                    startDate: localSearch.start,
+                    endDate: localSearch.end,
+                    adults: Number(localSearch.adults),
+                    kids: Number(localSearch.kids),
+                    babies: Number(localSearch.babies),
+                    pets: Number(localSearch.pets),
+                  })
+
                   const params = new URLSearchParams({
                     start: localSearch.start,
                     end: localSearch.end,

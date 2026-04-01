@@ -1,5 +1,4 @@
 //app/booking/success/page.tsx
-
 "use client"
 
 import { useEffect, useState } from "react"
@@ -8,68 +7,158 @@ import { useBooking } from "@/lib/booking-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle2, Clock, XCircle, Home, Hotel } from "lucide-react"
+import { CheckCircle2, Clock, XCircle, Home, Hotel, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { getReservationByIdPublicService } from "@/services/reservation.service"
+import type { ReservationDetailById } from "@/services/reservation.service"
 
 const statusConfig: Record<string, { label: string; icon: any; color: string }> = {
-  PENDING: { label: "Pendiente", icon: Clock, color: "text-amber-500" },
-  PAID_PENDING_APPROVAL: { label: "Pago recibido - Pendiente de aprobación", icon: Clock, color: "text-amber-500" },
-  CONFIRMED: { label: "Confirmada", icon: CheckCircle2, color: "text-green-500" },
-  APPROVED: { label: "Aprobada", icon: CheckCircle2, color: "text-green-500" },
-  REJECTED: { label: "Rechazada", icon: XCircle, color: "text-destructive" },
+  PENDING: {
+    label: "Pendiente",
+    icon: Clock,
+    color: "text-amber-500",
+  },
+  PAID_PENDING_APPROVAL: {
+    label: "Pago recibido - Pendiente de aprobación",
+    icon: Clock,
+    color: "text-amber-500",
+  },
+  CONFIRMED: {
+    label: "Confirmada",
+    icon: CheckCircle2,
+    color: "text-green-500",
+  },
+  APPROVED: {
+    label: "Aprobada",
+    icon: CheckCircle2,
+    color: "text-green-500",
+  },
+  REJECTED: {
+    label: "Rechazada",
+    icon: XCircle,
+    color: "text-destructive",
+  },
 }
+
+const FINAL_STATUSES = ["CONFIRMED", "APPROVED", "REJECTED"]
+const SUCCESS_STATUSES = ["CONFIRMED", "APPROVED"]
 
 export default function BookingSuccessPage() {
   const searchParams = useSearchParams()
   const resId = searchParams.get("id")
   const { resetBooking } = useBooking()
 
-  const [reservation, setReservation] = useState<any>(null)
+  const [reservation, setReservation] = useState<ReservationDetailById | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
-  if (!resId) {
-    setLoading(false)
-    setError("No se recibió id de reserva")
-    return
-  }
-
-  let alive = true
-
-  ;(async () => {
-    try {
-      console.log("ID RECIBIDO EN SUCCESS:", resId)
-
-      const res = await getReservationByIdPublicService(resId)
-      if (!alive) return
-
-      console.log("RESPUESTA COMPLETA RESERVA:", res)
-
-      if (!res?.ok || !res?.data) {
-        throw new Error(res?.message || "No se pudo consultar la reserva")
-      }
-
-      setReservation(res.data)
-    } catch (e: any) {
-      if (!alive) return
-      console.error("ERROR SUCCESS PAGE:", e)
-      setError(e?.message || "No se pudo consultar la reserva")
-    } finally {
-      if (alive) setLoading(false)
+    if (!resId) {
+      setLoading(false)
+      setError("No se recibió id de reserva")
+      return
     }
-  })()
 
-  return () => {
-    alive = false
-  }
-}, [resId])
+    let alive = true
+    let timeoutId: NodeJS.Timeout | null = null
+
+    const maxAttempts = 10
+    const intervalMs = 3000
+
+    const fetchReservation = async (currentAttempt = 1) => {
+      try {
+        if (!alive) return
+
+        setAttempt(currentAttempt)
+
+        console.log("ID RECIBIDO EN SUCCESS:", resId)
+
+        const res = await getReservationByIdPublicService(resId)
+        if (!alive) return
+
+        console.log("RESPUESTA COMPLETA RESERVA:", res)
+
+        if (!res?.ok || !res?.data) {
+          throw new Error(res?.message || "No se pudo consultar la reserva")
+        }
+
+        setError(null)
+        setReservation(res.data)
+
+        if (FINAL_STATUSES.includes(res.data.status)) {
+          setLoading(false)
+          return
+        }
+
+        if (currentAttempt >= maxAttempts) {
+          setLoading(false)
+          return
+        }
+
+        timeoutId = setTimeout(() => {
+          fetchReservation(currentAttempt + 1)
+        }, intervalMs)
+      } catch (e: any) {
+        if (!alive) return
+
+        console.error("ERROR SUCCESS PAGE:", e)
+
+        if (currentAttempt >= maxAttempts) {
+          setReservation(null)
+          setError(e?.message || "No se pudo consultar la reserva")
+          setLoading(false)
+          return
+        }
+
+        timeoutId = setTimeout(() => {
+          fetchReservation(currentAttempt + 1)
+        }, intervalMs)
+      }
+    }
+
+    fetchReservation(1)
+
+    return () => {
+      alive = false
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [resId])
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <p className="text-muted-foreground">Verificando estado de la reserva...</p>
+        <Card className="w-full max-w-md border-border text-center">
+          <CardContent className="p-8 space-y-4">
+            <Loader2 className="mx-auto h-10 w-10 animate-spin text-accent" />
+
+            <h2 className="font-serif text-xl font-bold text-foreground">
+              Verificando tu reserva
+            </h2>
+
+            <p className="text-muted-foreground">
+              Estamos procesando el estado de tu reserva. La página se actualizará automáticamente.
+            </p>
+
+            <div className="rounded-lg bg-muted p-4 text-sm text-left space-y-2">
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Reserva</span>
+                <span className="font-mono text-foreground break-all">{resId}</span>
+              </div>
+
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Intento</span>
+                <span className="text-foreground">
+                  {attempt} / 10
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Esto puede tardar unos segundos mientras el sistema confirma tu pago y actualiza la reserva.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -80,8 +169,22 @@ export default function BookingSuccessPage() {
         <Card className="w-full max-w-md border-border text-center">
           <CardContent className="p-8 space-y-4">
             <Hotel className="mx-auto h-12 w-12 text-muted-foreground" />
-            <h2 className="font-serif text-xl font-bold text-foreground">Reserva no encontrada</h2>
-            <p className="text-muted-foreground">{error || "No se pudo encontrar la reserva solicitada."}</p>
+            <h2 className="font-serif text-xl font-bold text-foreground">
+              Reserva no encontrada
+            </h2>
+            <p className="text-muted-foreground">
+              {error || "No se pudo encontrar la reserva solicitada."}
+            </p>
+
+            {resId && (
+              <div className="rounded-lg bg-muted p-4 text-sm text-left">
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">ID recibido</span>
+                  <span className="font-mono text-foreground break-all">{resId}</span>
+                </div>
+              </div>
+            )}
+
             <Link href="/">
               <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
                 Volver al inicio
@@ -96,6 +199,7 @@ export default function BookingSuccessPage() {
   const cfg = statusConfig[reservation.status] || statusConfig.PENDING
   const StatusIcon = cfg.icon
   const firstRoom = reservation.rooms?.[0]
+  const isSuccess = SUCCESS_STATUSES.includes(reservation.status)
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
@@ -105,38 +209,54 @@ export default function BookingSuccessPage() {
 
           <div className="space-y-2">
             <h1 className="font-serif text-2xl font-bold text-foreground">
-              {reservation.status === "CONFIRMED" || reservation.status === "APPROVED"
-                ? "Pago realizado con éxito"
-                : cfg.label}
+              {isSuccess ? "Pago realizado con éxito" : cfg.label}
             </h1>
+
             <p className="text-muted-foreground">
-              {reservation.status === "CONFIRMED" || reservation.status === "APPROVED"
+              {isSuccess
                 ? "Tu reserva ha sido confirmada exitosamente."
                 : reservation.status === "REJECTED"
                 ? "Lo sentimos, tu reserva fue rechazada."
-                : "Tu reserva está en proceso de validación."}
+                : "Tu reserva está en proceso de validación y esta página se actualizó automáticamente."}
             </p>
           </div>
 
           <div className="rounded-lg bg-muted p-4 space-y-3 text-left text-sm">
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">Código de reserva</span>
-              <span className="font-mono font-bold text-foreground">{reservation.id}</span>
+              <span className="font-mono font-bold text-foreground break-all">
+                {reservation.id}
+              </span>
             </div>
 
-            <div className="flex justify-between">
+            {!!reservation.reservationCode && (
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Código de verificación</span>
+                <span className="font-mono text-foreground">
+                  {reservation.reservationCode}
+                </span>
+              </div>
+            )}
+
+            <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">Cliente</span>
-              <span className="text-foreground">{reservation.client?.fullName}</span>
+              <span className="text-foreground text-right">
+                {reservation.client?.fullName || "-"}
+              </span>
             </div>
 
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">Habitación</span>
-              <span className="text-foreground">{firstRoom?.nameRoom || "-"}</span>
+              <span className="text-foreground text-right">
+                {firstRoom?.nameRoom || "-"}
+              </span>
             </div>
 
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">Fechas</span>
-              <span className="text-foreground">{reservation.startDate} - {reservation.endDate}</span>
+              <span className="text-foreground text-right">
+                {reservation.startDate} - {reservation.endDate}
+              </span>
             </div>
 
             <div className="flex justify-between border-t border-border pt-2">
@@ -149,7 +269,7 @@ export default function BookingSuccessPage() {
             <div className="flex justify-center pt-1">
               <Badge
                 variant={
-                  reservation.status === "CONFIRMED" || reservation.status === "APPROVED"
+                  isSuccess
                     ? "default"
                     : reservation.status === "REJECTED"
                     ? "destructive"
@@ -160,6 +280,19 @@ export default function BookingSuccessPage() {
               </Badge>
             </div>
           </div>
+
+          {!!reservation.services?.length && (
+            <div className="text-left">
+              <h4 className="mb-2 font-semibold text-foreground">Servicios</h4>
+              <div className="flex flex-wrap gap-2">
+                {reservation.services.map((service) => (
+                  <Badge key={service.id} variant="secondary">
+                    {service.name || "Servicio"}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
 
           <Link href="/" onClick={() => resetBooking()}>
             <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90 mt-2">
