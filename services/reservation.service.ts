@@ -128,7 +128,7 @@ export async function getReservationByClientAndCodePublicService(
   identificationNumber: string,
   code: string,
 ) {
-  return apiFetch<BackendReservationByClientAndCode>(
+  return apiFetch<ReservationByClientItem>(
     `/api/reservations/get-reservation-client/${identificationNumber}/reservation/${code}`,
     {
       method: "GET",

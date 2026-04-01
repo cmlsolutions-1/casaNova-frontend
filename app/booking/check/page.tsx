@@ -16,6 +16,7 @@ import { formatDateSpanish } from "@/utils/date"
 import { formatCurrencyCOP } from "@/utils/format"
 
 import { getReservationByClientAndCodePublicService } from "@/services/reservation.service"
+import type { ReservationByClientItem } from "@/services/reservation.service"
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
   PENDING: { label: "Pendiente", variant: "secondary" },
@@ -25,7 +26,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   REJECTED: { label: "Rechazada", variant: "destructive" },
 }
 
-type ReservationRoom = {
+/* type ReservationRoom = {
   id: string
   nameRoom: string
   price: number
@@ -37,7 +38,7 @@ type ReservationItem = {
   id: string
   startDate: string
   endDate: string
-  reservationCode: number | string
+  reservationCode?: number | string
   status: string
   totalValue: number | string
   client?: {
@@ -47,7 +48,7 @@ type ReservationItem = {
   }
   rooms?: ReservationRoom[]
   services?: any[]
-}
+} */
 
 export default function BookingCheckPage() {
   const router = useRouter()
@@ -56,7 +57,7 @@ export default function BookingCheckPage() {
   const [code, setCode] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [reservation, setReservation] = useState<ReservationItem | null>(null)
+  const [reservation, setReservation] = useState<ReservationByClientItem  | null>(null)
 
   const handleSearch = async () => {
     if (!document.trim()) {
@@ -81,11 +82,14 @@ export default function BookingCheckPage() {
         code.trim(),
       )
 
-      if (!res?.ok || !res?.data) {
-        throw new Error(res?.message || "No se encontró la reserva")
+
+      console.log("RESPUESTA COMPLETA:", res)
+      
+      if (!res?.id) {
+        throw new Error("No se encontró la reserva")
       }
 
-      setReservation(res.data)
+      setReservation(res)
     } catch (e: any) {
       setError(e?.message || "No se pudo consultar la reserva")
     } finally {
@@ -257,7 +261,7 @@ console.log("numberOfPeople room 0", reservation?.rooms?.[0]?.numberOfPeople)
                       <div className="flex flex-wrap gap-2">
                         {reservation.services.map((service, index) => (
                           <Badge key={`${service}-${index}`} variant="secondary">
-                            {service}
+                            {service.name || "Servicio"}
                           </Badge>
                         ))}
                       </div>
