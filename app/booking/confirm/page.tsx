@@ -1028,7 +1028,7 @@ export default function BookingConfirmPage() {
               disabled={!canProceedToPay}
               className="mt-6 h-auto w-full rounded-xl bg-accent py-3 text-base font-bold text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
             >
-              {paying ? "Redirigiendo a Mercado Pago..." : "Ir a Pagar"}
+              {paying ? "Redirigiendo ..." : "Ir a Pagar"}
               {!paying && <ArrowRight className="ml-2 h-4 w-4" />}
             </Button>
           </div>

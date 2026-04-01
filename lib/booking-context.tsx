@@ -312,18 +312,18 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
   const setSearchParams = useCallback((params: SearchParams) => {
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
 
-    setBooking({
+    setBooking((prev) => ({
+      ...prev, // Preserva guestInfo y otros datos
       searchParams: params,
-      selectedRooms: [],
-      selectedServices: [],
-      guestInfo: null,
+      selectedRooms: [], // Limpia habitaciones (tiene sentido volver a buscar)
+      selectedServices: [], // Limpia servicios
       consents: {
         acceptedTerms: false,
         acceptedMinorsPolicy: false,
       },
       extraBooking: null,
       expiresAt,
-    })
+    }))
   }, [])
 
   const addSelectedRoom = useCallback((room: any) => {

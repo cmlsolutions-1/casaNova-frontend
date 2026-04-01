@@ -315,9 +315,9 @@ function SearchResults() {
             return (
               <div
                 key={room.id}
-                className="group overflow-hidden rounded-2xl bg-card shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+                className="group flex flex-col h-full overflow-hidden rounded-2xl bg-card shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
               >
-                <div className="relative h-52 overflow-hidden">
+                <div className="relative h-52 overflow-hidden flex-shrink-0">
                   <img
                     src={img}
                     alt={`Habitación ${room.nameRoom}`}
@@ -325,7 +325,7 @@ function SearchResults() {
                   />
                 </div>
 
-                <div className="p-5">
+                <div className="flex flex-1 flex-col p-5">
                   <div className="mb-2 flex items-center justify-between">
                     <Badge variant="secondary" className="capitalize text-xs">{room.type}</Badge>
                     <div className="text-right">
@@ -342,7 +342,7 @@ function SearchResults() {
                     Hab. {room.nameRoom}
                   </h3>
 
-                  <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                  <p className="mt-1 text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem]">
                     {room.description}
                   </p>
 
@@ -359,6 +359,7 @@ function SearchResults() {
                     </span>
                   </div>
 
+                  <div className="mt-auto pt-4">
                   <Link
                     href={`/rooms/${room.id}?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}&remaining=${remaining}&returnTo=${returnTo}`}
                     className="mt-4 block"
@@ -368,6 +369,7 @@ function SearchResults() {
                     </Button>
                   </Link>
                 </div>
+              </div>
               </div>
             )
           })}

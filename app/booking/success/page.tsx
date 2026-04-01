@@ -45,7 +45,16 @@ const SUCCESS_STATUSES = ["CONFIRMED", "APPROVED"]
 
 export default function BookingSuccessPage() {
   const searchParams = useSearchParams()
-  const resId = searchParams.get("id")
+
+  // Buscar en múltiples parámetros
+  const resId = 
+    searchParams.get("id") || 
+    searchParams.get("external_reference") || 
+    searchParams.get("payment_id")
+
+  const paymentStatus = searchParams.get("status")
+  const collectionStatus = searchParams.get("collection_status")
+
   const { resetBooking } = useBooking()
 
   const [reservation, setReservation] = useState<ReservationDetailById | null>(null)
@@ -56,7 +65,7 @@ export default function BookingSuccessPage() {
   useEffect(() => {
     if (!resId) {
       setLoading(false)
-      setError("No se recibió id de reserva")
+      setError("No se recibió el identificador de la reserva en la URL")
       return
     }
 
@@ -72,7 +81,9 @@ export default function BookingSuccessPage() {
 
         setAttempt(currentAttempt)
 
-        console.log("ID RECIBIDO EN SUCCESS:", resId)
+
+        console.log("ID de reserva:", resId)
+        console.log("Payment status:", paymentStatus, collectionStatus)
 
         const res = await getReservationByIdPublicService(resId)
         if (!alive) return
@@ -91,22 +102,24 @@ export default function BookingSuccessPage() {
           return
         }
 
+        // Si alcanza máximo de intentos
         if (currentAttempt >= maxAttempts) {
           setLoading(false)
           return
         }
 
+        // Reintentar
         timeoutId = setTimeout(() => {
           fetchReservation(currentAttempt + 1)
         }, intervalMs)
       } catch (e: any) {
         if (!alive) return
 
-        console.error("ERROR SUCCESS PAGE:", e)
+        console.error("Error consultando reserva:", e)
 
         if (currentAttempt >= maxAttempts) {
           setReservation(null)
-          setError(e?.message || "No se pudo consultar la reserva")
+          setError(e?.message || "No se pudo consultar la reserva después de varios intentos")
           setLoading(false)
           return
         }
@@ -123,7 +136,7 @@ export default function BookingSuccessPage() {
       alive = false
       if (timeoutId) clearTimeout(timeoutId)
     }
-  }, [resId])
+  }, [resId, paymentStatus, collectionStatus])
 
   if (loading) {
     return (
