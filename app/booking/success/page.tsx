@@ -12,6 +12,9 @@ import Link from "next/link"
 import { getReservationByIdPublicService } from "@/services/reservation.service"
 import type { ReservationDetailById } from "@/services/reservation.service"
 
+import { format, parseISO } from "date-fns"
+import { es } from "date-fns/locale"
+
 const statusConfig: Record<string, { label: string; icon: any; color: string }> = {
   PENDING: {
     label: "Pendiente",
@@ -81,23 +84,21 @@ export default function BookingSuccessPage() {
 
         setAttempt(currentAttempt)
 
-
-        console.log("ID de reserva:", resId)
-        console.log("Payment status:", paymentStatus, collectionStatus)
-
         const res = await getReservationByIdPublicService(resId)
         if (!alive) return
 
         console.log("RESPUESTA COMPLETA RESERVA:", res)
 
-        if (!res?.ok || !res?.data) {
+        const reservationData = res?.data ?? res
+
+        if (!reservationData?.id) {
           throw new Error(res?.message || "No se pudo consultar la reserva")
         }
 
         setError(null)
-        setReservation(res.data)
+        setReservation(reservationData)
 
-        if (FINAL_STATUSES.includes(res.data.status)) {
+        if (FINAL_STATUSES.includes(reservationData.status)) {
           setLoading(false)
           return
         }
@@ -137,6 +138,13 @@ export default function BookingSuccessPage() {
       if (timeoutId) clearTimeout(timeoutId)
     }
   }, [resId, paymentStatus, collectionStatus])
+
+  function formatDateFromISO(isoString: string): string {
+    if (!isoString) return "-"
+    // Extrae "YYYY-MM-DD" y divide en partes
+    const [year, month, day] = isoString.slice(0, 10).split("-")
+    return `${day}-${month}-${year}`
+  }
 
   if (loading) {
     return (
@@ -259,6 +267,13 @@ export default function BookingSuccessPage() {
             </div>
 
             <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Nro Identificacion</span>
+              <span className="text-foreground text-right">
+                {reservation.client?.documentNumber || "-"}
+              </span>
+            </div>
+
+            <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">Habitación</span>
               <span className="text-foreground text-right">
                 {firstRoom?.nameRoom || "-"}
@@ -266,9 +281,25 @@ export default function BookingSuccessPage() {
             </div>
 
             <div className="flex justify-between gap-2">
-              <span className="text-muted-foreground">Fechas</span>
+              <span className="text-muted-foreground">Nro de Personas</span>
               <span className="text-foreground text-right">
-                {reservation.startDate} - {reservation.endDate}
+                {firstRoom?.numberOfPeople || "-"}
+              </span>
+            </div>
+
+            
+
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Check in</span>
+              <span className="text-foreground text-right">
+                {formatDateFromISO(reservation.startDate)}
+              </span>
+            </div>
+
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Check out</span>
+              <span className="text-foreground text-right">
+                {formatDateFromISO(reservation.endDate)}
               </span>
             </div>
 
