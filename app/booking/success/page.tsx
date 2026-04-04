@@ -49,11 +49,17 @@ const SUCCESS_STATUSES = ["CONFIRMED", "APPROVED"]
 export default function BookingSuccessPage() {
   const searchParams = useSearchParams()
 
-  // Buscar en múltiples parámetros
-  const resId = 
-    searchParams.get("id") || 
-    searchParams.get("external_reference") || 
-    searchParams.get("payment_id")
+  // Leer ID desde URL
+  const urlId = searchParams.get("id")
+  const externalRef = searchParams.get("external_reference")
+  const paymentId = searchParams.get("payment_id")
+
+   // Leer ID desde sessionStorage
+  const storedId = typeof window !== "undefined" ? sessionStorage.getItem("mp_reservation_id") : null
+
+  // Prioridad: URL id > sessionStorage > external_reference > payment_id
+  const resId = urlId || storedId || externalRef || paymentId
+    
 
   const paymentStatus = searchParams.get("status")
   const collectionStatus = searchParams.get("collection_status")
@@ -66,6 +72,11 @@ export default function BookingSuccessPage() {
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
+    // Limpiar sessionStorage al montar para evitar datos residuales
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("mp_reservation_id")
+    }
+
     if (!resId) {
       setLoading(false)
       setError("No se recibió el identificador de la reserva en la URL")
@@ -84,6 +95,8 @@ export default function BookingSuccessPage() {
 
         setAttempt(currentAttempt)
 
+        console.log(`Intento ${currentAttempt}: Consultando reserva ${resId}`)
+
         const res = await getReservationByIdPublicService(resId)
         if (!alive) return
 
@@ -99,12 +112,14 @@ export default function BookingSuccessPage() {
         setReservation(reservationData)
 
         if (FINAL_STATUSES.includes(reservationData.status)) {
+          console.log("Reserva en estado final:", reservationData.status)
           setLoading(false)
           return
         }
 
         // Si alcanza máximo de intentos
         if (currentAttempt >= maxAttempts) {
+          console.log("Máximo de intentos alcanzado")
           setLoading(false)
           return
         }
