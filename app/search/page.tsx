@@ -14,6 +14,7 @@ import Link from "next/link"
 import { listAvailableRoomsPublicService, type BackendRoom } from "@/services/room.service"
 import { parseISO, format } from "date-fns"
 import { es } from "date-fns/locale"
+import { calculateRoomPrice } from "@/utils/price-calculator"
 
 function SearchResults() {
   const searchParams = useSearchParams()
@@ -309,8 +310,21 @@ function SearchResults() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {rooms.map((room) => {
             const img = room.images?.[0]?.url || "/placeholder.svg"
+
+            // Calcular cuántas personas van en esta habitación
             const peopleForThisRoom = Math.min(room.capacity ?? 0, people)
-            const roomPricePerNight = Number(room.price ?? 0) * peopleForThisRoom
+
+            // Distribuir adultos y niños en esta habitación
+            const adultsInRoom = Math.min(adults, peopleForThisRoom)
+            const remainingCapacity = peopleForThisRoom - adultsInRoom
+            const kidsInRoom = Math.min(kids, remainingCapacity)
+
+            // Calcular precio con descuento para niños
+            const priceCalc = calculateRoomPrice(
+              Number(room.price ?? 0),
+              adultsInRoom,
+              kidsInRoom
+            )
 
             return (
               <div
@@ -330,13 +344,35 @@ function SearchResults() {
                     <Badge variant="secondary" className="capitalize text-xs">{room.type}</Badge>
                     <div className="text-right">
                       <span className="text-xl font-bold text-foreground">
-                        ${roomPricePerNight.toLocaleString()}
+                        ${priceCalc.total.toLocaleString()}
                       </span>
                       <p className="text-xs text-muted-foreground">
-                        ${Number(room.price).toLocaleString()} x {peopleForThisRoom} persona{peopleForThisRoom === 1 ? "" : "s"} / noche
+                        / noche
                       </p>
+
+                      {/* Desglose visual del precio */}
+                    <div className="mt-1 text-[10px] text-muted-foreground space-y-0.5">
+                      {adultsInRoom > 0 && (
+                        <p>
+                          {adultsInRoom} adulto{adultsInRoom > 1 ? "s" : ""} × ${Number(room.price).toLocaleString()} = ${(priceCalc.adultsPrice).toLocaleString()}
+                        </p>
+                      )}
+                      {kidsInRoom > 0 && (
+                        <p className="text-emerald-600 font-medium">
+                          {kidsInRoom} niño{kidsInRoom > 1 ? "s" : ""} × ${(Number(room.price) * 0.5).toLocaleString()} = ${priceCalc.kidsPrice.toLocaleString()}
+                        </p>
+                      )}
+                      {priceCalc.kidsDiscount > 0 && (
+                        <p className="text-emerald-600">
+                          Descuento niños: -${priceCalc.kidsDiscount.toLocaleString()}
+                        </p>
+                      )}
                     </div>
                   </div>
+                </div>
+
+
+
 
                   <h3 className="text-lg font-bold text-card-foreground">
                     Hab. {room.nameRoom}
@@ -358,6 +394,15 @@ function SearchResults() {
                       {room.doubleBeds > 0 ? `${room.doubleBeds} doble${room.doubleBeds > 1 ? "s" : ""}` : ""}
                     </span>
                   </div>
+
+                  {/* Badge de descuento si hay niños */}
+                  {kidsInRoom > 0 && (
+                    <div className="mt-2">
+                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-xs">
+                        ✓ Descuento de niños aplicado
+                      </Badge>
+                    </div>
+                  )}
 
                   <div className="mt-auto pt-4">
                   <Link

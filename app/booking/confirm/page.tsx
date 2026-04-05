@@ -36,6 +36,7 @@ import {
 
 import { EXTRA_BOOKING_OPTIONS } from "@/lib/day-services"
 import { formatCurrencyCOP } from "@/utils/format"
+import { calculateRoomPrice } from "@/utils/price-calculator"
 
 const PAYMENT_LOCK_KEY = "booking_payment_in_progress"
 
@@ -223,12 +224,24 @@ export default function BookingConfirmPage() {
   const roomsPerNight = isExtraBooking
     ? 0
     : selectedRooms.reduce((sum: number, r: any) => {
-        const selectedPeople = Number(r.selectedPeople ?? 1)
-        const selectedPricePerNight =
-          r.selectedPricePerNight ?? Number(r.price ?? 0) * selectedPeople
+      // Usar el priceBreakdown si existe, sino calcular
+      if (r.priceBreakdown) {
+        return sum + r.priceBreakdown.total
+      }
+      const selectedPeople = Number(r.selectedPeople ?? 1)
+      const selectedAdults = Number(r.selectedAdults ?? selectedPeople)
+      const selectedKids = Number(r.selectedKids ?? 0)
+      
+      const priceCalc = calculateRoomPrice(
+        Number(r.price ?? 0),
+        selectedAdults,
+        selectedKids
+      )
+      
+      return sum + priceCalc.total
+    }, 0)
 
-        return sum + Number(selectedPricePerNight)
-      }, 0)
+
 
   const roomsTotal = isExtraBooking ? 0 : roomsPerNight * nights
 
@@ -832,6 +845,12 @@ export default function BookingConfirmPage() {
                   const name = room.nameRoom ?? room.name ?? "Habitación"
                   const type = room.type ?? ""
 
+                  const priceCalc = room.priceBreakdown ?? calculateRoomPrice(
+                    Number(room.price ?? 0),
+                    Number(room.selectedAdults ?? room.selectedPeople ?? 1),
+                    Number(room.selectedKids ?? 0)
+                  )
+
                   return (
                     <div key={room.id} className="flex gap-4">
                       <img
@@ -843,9 +862,28 @@ export default function BookingConfirmPage() {
                         <h3 className="truncate font-bold text-card-foreground">Hab. {name}</h3>
                         <p className="text-sm capitalize text-muted-foreground">{type}</p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Capacidad:{" "}
-                          <span className="font-medium text-foreground">{room.capacity ?? "-"}</span>
+                          Capacidad: <span className="font-medium text-foreground">{room.capacity ?? "-"}</span>
                         </p>
+
+                  {/* Desglose de precio */}
+                          <div className="mt-2 space-y-1">
+                            <p className="text-sm font-bold">
+                              ${priceCalc.total.toLocaleString()}
+                              <span className="font-normal text-muted-foreground"> / noche</span>
+                            </p>
+                            
+                            <div className="text-[11px] text-muted-foreground space-y-0.5">
+                              {priceCalc.adultsPrice > 0 && (
+                                <p>${Number(room.price).toLocaleString()} × adulto</p>
+                              )}
+                              {priceCalc.kidsPrice > 0 && (
+                                <p className="text-emerald-600">
+                                  ${(Number(room.price) * 0.5).toLocaleString()} × niño (50% dto)
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
                         <p className="mt-1 text-sm font-bold">
                           {(
                             room.selectedPricePerNight ??

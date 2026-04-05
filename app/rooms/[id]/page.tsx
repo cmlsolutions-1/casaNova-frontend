@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 
 import { getRoomPublicService, type BackendRoom } from "@/services/room.service"
+import { calculateRoomPrice, formatCOP } from "@/utils/price-calculator"
 
 function RoomDetailContent({ roomId }: { roomId: string }) {
   const router = useRouter()
@@ -84,9 +85,17 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
     ? Math.min(Number(room.capacity ?? 0), remainingBeforeSelection || totalRequestedPeople)
     : 0
 
-  const roomPricePerNight = room
-    ? Number(room.price ?? 0) * selectedPeopleForThisRoom
-    : 0
+  // Distribuir adultos y niños en esta habitación
+  const adultsInRoom = Math.min(adults, selectedPeopleForThisRoom)
+  const remainingCapacity = selectedPeopleForThisRoom - adultsInRoom
+  const kidsInRoom = Math.min(kids, remainingCapacity)
+
+  // Calcular precio con descuento para niños
+  const priceCalc = room
+    ? calculateRoomPrice(Number(room.price ?? 0), adultsInRoom, kidsInRoom)
+    : { total: 0, adultsPrice: 0, kidsPrice: 0, kidsDiscount: 0 }
+
+  const roomPricePerNight = priceCalc.total
 
   // Normaliza urls (backend devuelve [{id,url}])
   const imageUrls = useMemo(() => {
@@ -128,6 +137,9 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
       ...room,
       selectedPeople: selectedPeopleForThisRoom,
       selectedPricePerNight: roomPricePerNight,
+      selectedAdults: adultsInRoom,
+      selectedKids: kidsInRoom,
+      priceBreakdown: priceCalc,
     }
 
     if (returnTo === "confirm") {
@@ -291,11 +303,34 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
               </span>
               <span className="text-muted-foreground">/ noche</span>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {/* ${Number(room.price).toLocaleString()} x persona{selectedPeopleForThisRoom === 1 ? "" : "s"} */}
-              ${Number(room.price).toLocaleString()} x persona
-            </p>
-          </div>
+
+
+            {/* Desglose visual del precio */}
+              <div className="mt-2 rounded-xl bg-secondary/50 p-3 space-y-1.5">
+                {priceCalc.adultsPrice > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {adultsInRoom} adulto{adultsInRoom > 1 ? "s" : ""} × ${Number(room.price).toLocaleString()}
+                    </span>
+                    <span className="font-medium">${priceCalc.adultsPrice.toLocaleString()}</span>
+                  </div>
+                )}
+                {priceCalc.kidsPrice > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-emerald-600">
+                      {kidsInRoom} niño{kidsInRoom > 1 ? "s" : ""} × ${(Number(room.price) * 0.5).toLocaleString()}
+                    </span>
+                    <span className="font-medium text-emerald-600">${priceCalc.kidsPrice.toLocaleString()}</span>
+                  </div>
+                )}
+                {priceCalc.kidsDiscount > 0 && (
+                  <div className="flex justify-between text-sm border-t border-border pt-1.5">
+                    <span className="text-emerald-600 font-medium">Descuento niños</span>
+                    <span className="font-medium text-emerald-600">-${priceCalc.kidsDiscount.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
 
             <div className="mt-6 grid grid-cols-2 gap-3">
               <div className="rounded-xl bg-secondary p-3 text-center">
