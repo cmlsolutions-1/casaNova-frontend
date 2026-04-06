@@ -1,3 +1,4 @@
+//components/search-bar.tsx
 "use client"
 
 import { useState } from "react"
@@ -12,20 +13,27 @@ import { useBooking } from "@/lib/booking-context"
 
 function GuestCounter({
   label,
+  description,
   value,
   onChange,
   min = 0,
   max = 10,
 }: {
   label: string
+  description?: string
   value: number
   onChange: (v: number) => void
   min?: number
   max?: number
 }) {
   return (
-    <div className="flex items-center justify-between py-2">
+    <div className="flex items-start justify-between py-2">
+      <div className="flex flex-col gap-0.5">
       <span className="text-sm font-medium text-foreground">{label}</span>
+      {description && (
+          <span className="text-xs text-muted-foreground">{description}</span>
+        )}
+        </div>
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -220,9 +228,9 @@ export function SearchBar() {
               </PopoverTrigger>
               <PopoverContent className="w-72" align="start">
                 <div className="space-y-1">
-                  <GuestCounter label="Adultos" value={adults} onChange={setAdults} min={1} max={10} />
-                  <GuestCounter label="Niños" value={kids} onChange={setKids} />
-                  <GuestCounter label="Bebés" value={babies} onChange={setBabies} />
+                  <GuestCounter label="Adultos" description="9 años o más" value={adults} onChange={setAdults} min={1} max={10} />
+                  <GuestCounter label="Niños" description="De 5 a 8 años" value={kids} onChange={setKids} />
+                  <GuestCounter label="Bebés" description="Menos de 5 años" value={babies} onChange={setBabies} />
                   <GuestCounter label="Mascotas" value={pets} onChange={setPets} max={3} />
 
                   <div className="pt-3">

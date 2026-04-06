@@ -563,11 +563,12 @@ export default function BookingConfirmPage() {
   const guestFields: Array<{
     key: "adults" | "kids" | "babies" | "pets"
     label: string
+    description?: string
     min: number
   }> = [
-    { key: "adults", label: "Adultos", min: 1 },
-    { key: "kids", label: "Niños", min: 0 },
-    { key: "babies", label: "Bebés", min: 0 },
+    { key: "adults", label: "Adultos", description: "9 años o más", min: 1 },
+    { key: "kids", label: "Niños", description: "De 5 a 8 años", min: 0 },
+    { key: "babies", label: "Bebés", description: "Menos de 5 años", min: 0 },
     { key: "pets", label: "Mascotas", min: 0 },
   ]
 
@@ -693,6 +694,10 @@ export default function BookingConfirmPage() {
                   {guestFields.map((item) => (
                     <div key={item.key}>
                       <Label className="mb-1 block text-xs text-muted-foreground">{item.label}</Label>
+                      {/* Descripción con color más suave */}
+                      {item.description && (
+                        <p className="mb-1 text-[10px] text-muted-foreground/70">{item.description}</p>
+                      )}
 
                       <div className="flex items-center rounded-xl border border-border">
                         <button
@@ -1048,6 +1053,9 @@ export default function BookingConfirmPage() {
                     Confirmo que, en caso de ingresar menores de edad, deberán presentar tarjeta
                     de identidad o registro civil y deberán estar acompañados por su padre o madre.
                     No se permite el ingreso únicamente con tíos, hermanos u otros acompañantes.
+                    Al igual se verificara la edad de los menores al momento del check-in, por lo 
+                    que se recomienda llevar los documentos necesarios para evitar inconvenientes. 
+                    En caso de no cumplir con esta política, la reserva podría ser cancelada sin derecho a reembolso.
                   </Label>
                 </div>
               </div>

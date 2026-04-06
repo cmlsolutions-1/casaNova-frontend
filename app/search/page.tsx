@@ -144,6 +144,7 @@ function SearchResults() {
             {/* LLEGADA */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground">Llegada</label>
+              <span className="text-[10px] text-muted-foreground/70 invisible">.</span>
               <input
                 type="date"
                 value={localSearch.start}
@@ -157,6 +158,7 @@ function SearchResults() {
             {/* SALIDA */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground">Salida</label>
+              <span className="text-[10px] text-muted-foreground/70 invisible">.</span>
               <input
                 type="date"
                 value={localSearch.end}
@@ -170,6 +172,7 @@ function SearchResults() {
             {/* ADULTOS */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground">Adultos</label>
+              <span className="text-[10px] text-muted-foreground/70">9 años o más</span>
               <input
                 type="number"
                 min={1}
@@ -184,6 +187,7 @@ function SearchResults() {
             {/* NIÑOS */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground">Niños</label>
+              <span className="text-[10px] text-muted-foreground/70">De 5 a 8 años</span>
               <input
                 type="number"
                 min={0}
@@ -198,6 +202,7 @@ function SearchResults() {
             {/* BEBÉS */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground">Bebés</label>
+              <span className="text-[10px] text-muted-foreground/70">Menos de 5 años</span>
               <input
                 type="number"
                 min={0}
@@ -212,6 +217,7 @@ function SearchResults() {
             {/* MASCOTAS */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground">Mascotas</label>
+              <span className="text-[10px] text-muted-foreground/70 invisible">.</span>
               <input
                 type="number"
                 min={0}
