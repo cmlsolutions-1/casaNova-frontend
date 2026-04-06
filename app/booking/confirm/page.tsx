@@ -92,9 +92,6 @@ export default function BookingConfirmPage() {
 
   useEffect(() => {
     paymentLockRef.current = false
-    if (typeof window !== "undefined") {
-      sessionStorage.removeItem(PAYMENT_LOCK_KEY)
-    }
   }, [])
 
   useEffect(() => {
@@ -418,16 +415,9 @@ export default function BookingConfirmPage() {
           throw new Error("El backend no devolvió id de reserva")
         }
 
-        // GUARDAR ID EN SESSION STORAGE
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("mp_reservation_id", reservationId)
-        }
-
         const paymentRes = await createPaymentPublicService({ reservationId })
 
         if (!paymentRes?.ok) {
-          // LIMPIAR STORAGE EN CASO DE ERROR
-          sessionStorage.removeItem("mp_reservation_id")
           throw new Error(paymentRes?.message || "No se pudo generar el link de pago")
         }
 
@@ -435,7 +425,6 @@ export default function BookingConfirmPage() {
 
         if (!checkoutUrl) {
           // Limpiar en caso de error
-          sessionStorage.removeItem("mp_reservation_id")
           throw new Error("No se recibió el link de pago de Mercado Pago")
         }
 
@@ -546,15 +535,9 @@ export default function BookingConfirmPage() {
         throw new Error("El backend no devolvió id de reserva")
       }
 
-      // GUARDAR ID EN SESSION STORAGE
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("mp_reservation_id", reservationId)
-      }
-
       const paymentRes = await createPaymentPublicService({ reservationId })
 
       if (!paymentRes?.ok) {
-        sessionStorage.removeItem("mp_reservation_id")
         throw new Error(paymentRes?.message || "No se pudo generar el link de pago")
       }
 
@@ -573,7 +556,6 @@ export default function BookingConfirmPage() {
 
       if (typeof window !== "undefined") {
         sessionStorage.removeItem(PAYMENT_LOCK_KEY)
-        sessionStorage.removeItem("mp_reservation_id")
       }
     }
   }
