@@ -75,8 +75,8 @@ export function RoomsPreview() {
             Nuestras Habitaciones
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
-            Cada habitacion ha sido diseñada con atención al detalle para
-            ofrecer el maximo confort y elegancia.
+            Cada habitación ha sido diseñada con atención al detalle para
+            ofrecer el máximo confort y elegancia.
           </p>
         </div>
 

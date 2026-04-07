@@ -29,7 +29,7 @@ const zonasSociales: ZonaSocialItem[] = [
   {
     id: 3,
     title: "Naturaleza y tranquilidad",
-    subtitle: "Un entorno acogedor para desconectarte y respirar calma",
+    subtitle: "Un entorno acogedor para desconectarte y respirar con calma",
     image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/ZONASOCIAL.jpg",
   },
   {
@@ -88,7 +88,7 @@ const zonasSociales: ZonaSocialItem[] = [
   },
   {
     id: 13,
-    title: "Momentos para brindar",
+    title: "Momentos para compartir",
     subtitle: "Un espacio para disfrutar y compartir momentos especiales con amigos y seres queridos",
     image: "https://casanova.sfo3.cdn.digitaloceanspaces.com/Imagenes/BAR.jpg",
   },

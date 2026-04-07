@@ -20,8 +20,8 @@ export function PublicFooter() {
               <span className="font-serif text-xl font-bold">Casa Nova</span>
             </div>
             <p className="text-sm leading-relaxed text-primary-foreground/70">
-              Donde el lujo se encuentra con la serenidad. Una experiencia unica de hospitalidad
-              y confort desde 1985.
+              Donde el lujo se encuentra con la serenidad. Una experiencia única de hospitalidad
+              y confort.
             </p>
           </div>
           <div>
@@ -42,7 +42,7 @@ export function PublicFooter() {
                 Consultar Reserva
               </Link>
               <Link href="/admin/login" className="text-sm text-primary-foreground/70 hover:text-accent transition-colors">
-                Administracion
+                Administración
               </Link>
             </nav>
           </div>
@@ -53,15 +53,15 @@ export function PublicFooter() {
             <div className="flex flex-col gap-3">
               <span className="flex items-center gap-2 text-sm text-primary-foreground/70">
                 <MapPin className="h-4 w-4 text-accent" />
-                Hojas Anchas, Ramal agucatal Circasia-Quindio
+                Vereda Hojas Anchas, Ramal aguacatal Circasia-Quindio
               </span>
               <span className="flex items-center gap-2 text-sm text-primary-foreground/70">
                 <Phone className="h-4 w-4 text-accent" />
-                +573007972614
+                +573168871765 - +573007972614
               </span>
               <span className="flex items-center gap-2 text-sm text-primary-foreground/70">
                 <Mail className="h-4 w-4 text-accent" />
-                info@grandluxehotel.com
+                casanovahotelcampestre@gmail.com
               </span>
             </div>
           </div>

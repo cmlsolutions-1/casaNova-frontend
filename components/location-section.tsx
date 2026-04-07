@@ -28,7 +28,7 @@ export function LocationSection() {
             <h3 className="text-lg font-bold text-card-foreground">Hotel Casanova</h3>
 
             <p className="mt-2 text-sm text-muted-foreground">
-              Dirección: <span className="font-medium text-foreground">Hojas anchas</span>
+              Dirección: <span className="font-medium text-foreground">Vereda Hojas Anchas</span>
             </p>
 
             <p className="mt-2 text-sm text-muted-foreground">

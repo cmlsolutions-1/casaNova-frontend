@@ -57,7 +57,7 @@ export function HeroCarousel({ images }: HeroCarouselProps) {
           <span className="text-white">Hotel Campestre</span>
         </h1>
         <p className="mt-4 max-w-xl text-base font-medium leading-relaxed text-white/90 drop-shadow-md md:text-lg">
-          Donde el lujo se encuentra con la serenidad. Descubra una experiencia unica de hospitalidad y confort.
+          Donde el lujo se encuentra con la serenidad. Descubra una experiencia única de hospitalidad y confort.
         </p>
       </div>
 

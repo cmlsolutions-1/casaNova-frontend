@@ -1053,7 +1053,7 @@ export default function BookingConfirmPage() {
                     Confirmo que, en caso de ingresar menores de edad, deberán presentar tarjeta
                     de identidad o registro civil y deberán estar acompañados por su padre o madre.
                     No se permite el ingreso únicamente con tíos, hermanos u otros acompañantes.
-                    Al igual se verificara la edad de los menores al momento del check-in, por lo 
+                    Al igual se verificará la edad de los menores al momento del check-in, por lo 
                     que se recomienda llevar los documentos necesarios para evitar inconvenientes. 
                     En caso de no cumplir con esta política, la reserva podría ser cancelada sin derecho a reembolso.
                   </Label>
