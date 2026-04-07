@@ -1,3 +1,5 @@
+//components/auto-image-carousel.tsx
+
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
