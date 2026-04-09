@@ -6,23 +6,28 @@
 export function calculateRoomPrice(
   pricePerPerson: number,
   adults: number,
-  kids: number = 0
+  kids: number = 0,
+  pets: number = 0
 ): {
   total: number
   adultsPrice: number
   kidsPrice: number
+  petsPrice: number
   kidsDiscount: number
 } {
   const adultPrice = pricePerPerson
   const kidPrice = pricePerPerson * 0.5
+  const petPrice = 20000 // Precio por mascota por noche
 
   const adultsTotal = adultPrice * adults
   const kidsTotal = kidPrice * kids
+  const petsTotal = petPrice * pets
 
   return {
-    total: adultsTotal + kidsTotal,
+    total: adultsTotal + kidsTotal + petsTotal,
     adultsPrice: adultsTotal,
     kidsPrice: kidsTotal,
+    petsPrice: petsTotal,
     kidsDiscount: kids > 0 ? (adultPrice - kidPrice) * kids : 0,
   }
 }

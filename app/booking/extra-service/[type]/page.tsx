@@ -1,5 +1,3 @@
-//app/booking/extra-service/[type]/page.tsx
-
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
@@ -14,6 +12,13 @@ import {
   listServicesPublicService,
   type BackendService,
 } from "@/services/service.service"
+
+// Configuración de precios y límites
+const DAY_PASS_MIN_PEOPLE = 10
+const DAY_PASS_MAX_PEOPLE = 100
+const DAY_PASS_PRICE_PER_PERSON = 25000 // $25.000 por persona
+
+const EVENT_HALL_MAX_PEOPLE = 150
 
 function getExtraServiceKind(serviceName: string): "DAY_PASS" | "EVENT_HALL" {
   const name = serviceName.toLowerCase()
@@ -35,7 +40,7 @@ export default function ExtraServiceBookingPage() {
   const [service, setService] = useState<BackendService | null>(null)
   const [loading, setLoading] = useState(true)
   const [date, setDate] = useState("")
-  const [people, setPeople] = useState(20)
+  const [people, setPeople] = useState(DAY_PASS_MIN_PEOPLE)
   const [error, setError] = useState("")
 
   useEffect(() => {
@@ -56,7 +61,8 @@ export default function ExtraServiceBookingPage() {
 
         if (found) {
           const kind = getExtraServiceKind(found.name)
-          setPeople(kind === "DAY_PASS" ? 20 : 1)
+          // Iniciar con mínimo 10 personas para DAY_PASS
+          setPeople(kind === "DAY_PASS" ? DAY_PASS_MIN_PEOPLE : 1)
         }
       } catch {
         if (!alive) return
@@ -73,15 +79,28 @@ export default function ExtraServiceBookingPage() {
 
   const kind = service ? getExtraServiceKind(service.name) : null
 
+  // ✅ Cálculo corregido: Total = personas × precio por persona
   const total = useMemo(() => {
     if (!service || !kind) return 0
 
     if (kind === "DAY_PASS") {
-      const extraPeople = Math.max(0, people - 20)
-      return Number(service.price) + extraPeople * 25000
+      // El precio es por persona: Total = personas × $25.000
+      return people * DAY_PASS_PRICE_PER_PERSON
     }
 
+    // EVENT_HALL: precio fijo del servicio
     return Number(service.price)
+  }, [service, kind, people])
+
+  // Desglose del precio para DAY_PASS
+  const priceBreakdown = useMemo(() => {
+    if (!service || kind !== "DAY_PASS") return null
+
+    return {
+      pricePerPerson: DAY_PASS_PRICE_PER_PERSON,
+      people,
+      total: people * DAY_PASS_PRICE_PER_PERSON,
+    }
   }, [service, kind, people])
 
   if (loading) {
@@ -108,13 +127,19 @@ export default function ExtraServiceBookingPage() {
       return
     }
 
-    if (kind === "DAY_PASS" && people < 20) {
-      setError("El pasadía requiere mínimo 20 personas.")
-      return
+    if (kind === "DAY_PASS") {
+      if (people < DAY_PASS_MIN_PEOPLE) {
+        setError(`El pasadía requiere mínimo ${DAY_PASS_MIN_PEOPLE} personas.`)
+        return
+      }
+      if (people > DAY_PASS_MAX_PEOPLE) {
+        setError(`El pasadía permite máximo ${DAY_PASS_MAX_PEOPLE} personas.`)
+        return
+      }
     }
 
-    if (kind === "EVENT_HALL" && people > 150) {
-      setError("El salón de eventos permite máximo 150 personas.")
+    if (kind === "EVENT_HALL" && people > EVENT_HALL_MAX_PEOPLE) {
+      setError(`El salón de eventos permite máximo ${EVENT_HALL_MAX_PEOPLE} personas.`)
       return
     }
 
@@ -144,7 +169,9 @@ export default function ExtraServiceBookingPage() {
         <h1 className="font-serif text-3xl font-bold text-foreground md:text-4xl">
           {service.name}
         </h1>
-        <p className="mt-3 max-w-2xl text-muted-foreground">{service.description}</p>
+        <p className="mt-3 max-w-2xl text-muted-foreground">
+          {service.description || service.decription}
+        </p>
       </div>
 
       <Card className="border-border shadow-lg">
@@ -181,7 +208,7 @@ export default function ExtraServiceBookingPage() {
                       type="button"
                       onClick={() =>
                         setPeople((prev) =>
-                          Math.max(kind === "DAY_PASS" ? 20 : 1, prev - 1)
+                          Math.max(kind === "DAY_PASS" ? DAY_PASS_MIN_PEOPLE : 1, prev - 1)
                         )
                       }
                       className="flex h-8 w-8 items-center justify-center rounded-full border border-border hover:bg-secondary"
@@ -193,7 +220,10 @@ export default function ExtraServiceBookingPage() {
                       type="button"
                       onClick={() =>
                         setPeople((prev) =>
-                          Math.min(kind === "EVENT_HALL" ? 150 : 300, prev + 1)
+                          Math.min(
+                            kind === "DAY_PASS" ? DAY_PASS_MAX_PEOPLE : EVENT_HALL_MAX_PEOPLE,
+                            prev + 1
+                          )
                         )
                       }
                       className="flex h-8 w-8 items-center justify-center rounded-full border border-border hover:bg-secondary"
@@ -202,6 +232,12 @@ export default function ExtraServiceBookingPage() {
                     </button>
                   </div>
                 </div>
+                
+                {kind === "DAY_PASS" && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Mínimo {DAY_PASS_MIN_PEOPLE} personas | Máximo {DAY_PASS_MAX_PEOPLE} personas | ${DAY_PASS_PRICE_PER_PERSON.toLocaleString()} por persona
+                  </p>
+                )}
               </div>
 
               {error && (
@@ -234,25 +270,39 @@ export default function ExtraServiceBookingPage() {
                   <span className="font-medium text-foreground">{people}</span>
                 </div>
 
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Condición</span>
-                  <span className="font-medium text-foreground">
-                    {kind === "DAY_PASS" ? "Mínimo 20 personas" : "Máximo 150 personas"}
-                  </span>
-                </div>
-
-                {kind === "EVENT_HALL" && (
-                  <div className="flex justify-between gap-4">
-                    <span className="text-muted-foreground">Horario</span>
-                    <span className="font-medium text-foreground">7:00 pm a 2:30 am</span>
-                  </div>
+                {kind === "DAY_PASS" && priceBreakdown && (
+                  <>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">Precio por persona</span>
+                      <span className="font-medium text-foreground">
+                        {formatCurrencyCOP(priceBreakdown.pricePerPerson)}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">
+                        {priceBreakdown.people} persona(s) × {formatCurrencyCOP(priceBreakdown.pricePerPerson)}
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {formatCurrencyCOP(priceBreakdown.total)}
+                      </span>
+                    </div>
+                  </>
                 )}
 
-                {kind === "DAY_PASS" && (
-                  <div className="flex justify-between gap-4">
-                    <span className="text-muted-foreground">Adicional</span>
-                    <span className="font-medium text-foreground">$25.000 por persona</span>
-                  </div>
+                {kind === "EVENT_HALL" && (
+                  <>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">Condición</span>
+                      <span className="font-medium text-foreground">
+                        Máximo {EVENT_HALL_MAX_PEOPLE} personas
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">Horario</span>
+                      <span className="font-medium text-foreground">7:00 pm a 2:30 am</span>
+                    </div>
+                  </>
                 )}
 
                 <div className="border-t border-border pt-3">

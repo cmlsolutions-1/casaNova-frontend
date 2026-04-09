@@ -81,7 +81,7 @@ function ServiceForm({
   const hasExistingImages = (service?.images?.length ?? 0) > 0
   const hasUploadedIds = uploadedImageIds.length > 0
 
-  const MAX_SERVICE_IMAGES = 6
+  const MAX_SERVICE_IMAGES = 10
 
     function moveItemToFront<T extends { id: string }>(items: T[], id: string): T[] {
       const index = items.findIndex((item) => item.id === id)

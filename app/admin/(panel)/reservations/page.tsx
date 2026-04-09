@@ -233,7 +233,7 @@ export default function AdminReservationsPage() {
                       {res.client?.fullName || res.client?.documentNumber || "Sin nombre"}
                     </td>
                     <td className="py-3 pr-4 text-foreground">
-                      {res.client?.documentNumber || "Sin teléfono"}
+                      {res.client?.phone || "Sin teléfono"}
                     </td>
                     <td className="py-3 pr-4 text-muted-foreground">{detailLabel}</td>
                     <td className="py-3 pr-4 text-xs text-muted-foreground">

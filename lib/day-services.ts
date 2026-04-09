@@ -19,7 +19,7 @@ export const EXTRA_BOOKING_OPTIONS: Record<ExtraBookingType, ExtraBookingConfig>
     type: "DAY_PASS",
     title: "Pasadía",
     description:
-      "Disfruta de un día especial con acceso a nuestras instalaciones. Mínimo 20 personas.",
+      "Disfruta de un día especial con acceso a nuestras instalaciones. Mínimo 10 personas.",
     basePrice: 500000,
     minPeople: 20,
     additionalPersonPrice: 25000,

@@ -33,10 +33,16 @@ export default function BookingTermsPage() {
         <section className="space-y-2">
           <h2 className="text-lg font-bold text-foreground">2. Cancelaciones y devoluciones</h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Las cancelaciones y devoluciones estarán sujetas a validación administrativa
-            y a las políticas vigentes del hotel al momento de la reserva. En caso de que
-            aplique devolución, esta podrá tomar algunos días hábiles según el medio de pago
-            utilizado y las validaciones internas correspondientes.
+            Una vez efectuado el pago total o parcial de la reserva, 
+            no habrá lugar a devolución de dinero bajo ninguna circunstancia, incluyendo, 
+            pero sin limitarse a, cancelaciones voluntarias, no presentación (no show), 
+            cambios de itinerario, condiciones climáticas, situaciones personales o cualquier 
+            otra causa ajena al hotel.
+
+            El huésped acepta expresamente esta condición al momento de realizar la reserva.
+            No obstante, el Hotel Campestre Casanova podrá, a su entera discreción y previa validación 
+            administrativa, autorizar la reprogramación de la reserva, sujeta a disponibilidad, 
+            tarifas vigentes y condiciones internas del establecimiento.
           </p>
         </section>
 

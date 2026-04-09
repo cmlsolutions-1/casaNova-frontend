@@ -56,6 +56,7 @@ export type ReservationClient = {
   id: string
   fullName?: string
   documentNumber: string
+  phone?: string
 }
 
 export type ReservationServiceItem = {

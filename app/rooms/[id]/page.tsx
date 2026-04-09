@@ -64,6 +64,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
   }, [roomId])
 
   const remaining = Number(searchParams.get("remaining")) || 0
+
   // Params de búsqueda (se conservan)
   const start = searchParams.get("start") || booking.searchParams?.startDate || ""
   const end = searchParams.get("end") || booking.searchParams?.endDate || ""
@@ -90,10 +91,12 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
   const remainingCapacity = selectedPeopleForThisRoom - adultsInRoom
   const kidsInRoom = Math.min(kids, remainingCapacity)
 
+  const petsInRoom = Math.min(pets, room?.capacity ?? 0)
+
   // Calcular precio con descuento para niños
   const priceCalc = room
-    ? calculateRoomPrice(Number(room.price ?? 0), adultsInRoom, kidsInRoom)
-    : { total: 0, adultsPrice: 0, kidsPrice: 0, kidsDiscount: 0 }
+    ? calculateRoomPrice(Number(room.price ?? 0), adultsInRoom, kidsInRoom, petsInRoom)
+    : { total: 0, adultsPrice: 0, kidsPrice: 0, petsPrice: 0, kidsDiscount: 0 }
 
   const roomPricePerNight = priceCalc.total
 
@@ -139,6 +142,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
       selectedPricePerNight: roomPricePerNight,
       selectedAdults: adultsInRoom,
       selectedKids: kidsInRoom,
+      selectedPets: petsInRoom,
       priceBreakdown: priceCalc,
     }
 
@@ -323,6 +327,14 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
                     <span className="font-medium text-emerald-600">${priceCalc.kidsPrice.toLocaleString()}</span>
                   </div>
                 )}
+                {priceCalc.petsPrice > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-amber-600">
+                      {petsInRoom} mascota{petsInRoom > 1 ? "s" : ""} × $20.000
+                    </span>
+                    <span className="font-medium text-amber-600">${priceCalc.petsPrice.toLocaleString()}</span>
+                  </div>
+                )}
                 {priceCalc.kidsDiscount > 0 && (
                   <div className="flex justify-between text-sm border-t border-border pt-1.5">
                     <span className="text-emerald-600 font-medium">Descuento niños</span>
@@ -366,6 +378,21 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
                 ))}
               </div>
             </div>
+            {/* Badges informativos */}
+            {(kidsInRoom > 0 || petsInRoom > 0) && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {kidsInRoom > 0 && (
+                  <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-xs">
+                    ✓ Descuento niños aplicado
+                  </Badge>
+                )}
+                {petsInRoom > 0 && (
+                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs">
+                    +${priceCalc.petsPrice.toLocaleString()} por mascotas
+                  </Badge>
+                )}
+              </div>
+            )}
 
             <Button
               onClick={handleSelect}

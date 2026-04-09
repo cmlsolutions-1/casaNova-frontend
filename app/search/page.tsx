@@ -46,7 +46,6 @@ function SearchResults() {
 
   const returnTo = searchParams.get("returnTo") || ""
 
-  // Fechas bonitas
   const prettyRange = useMemo(() => {
     try {
       if (!start || !end) return ""
@@ -60,15 +59,12 @@ function SearchResults() {
     if (returnTo === "confirm") {
       return new Set<string>()
     }
-
     const list = booking.selectedRooms ?? []
-      return new Set(list.map((r: any) => String(r?.id)))
-    }, [booking.selectedRooms, returnTo])
+    return new Set(list.map((r: any) => String(r?.id)))
+  }, [booking.selectedRooms, returnTo])
 
   useEffect(() => {
     let alive = true
-
-    // si falta algo, no consultamos
     if (!start || !end || !people) {
       setRooms([])
       setLoading(false)
@@ -82,14 +78,9 @@ function SearchResults() {
       try {
         const data = await listAvailableRoomsPublicService({ start, end, people })
         if (!alive) return
-
-        // opcional: filtrar solo activas
         const filtered = (data ?? [])
-        .filter((r) => r.status === "ACTIVE")
-        .filter((r) => !selectedIds.has(String(r.id))) // ya seleccionadas NO aparecen
-
-      setRooms(filtered)
-
+          .filter((r) => r.status === "ACTIVE")
+          .filter((r) => !selectedIds.has(String(r.id)))
         setRooms(filtered)
       } catch (e: any) {
         if (!alive) return
@@ -100,10 +91,42 @@ function SearchResults() {
       }
     })()
 
-    return () => {
-      alive = false
-    }
+    return () => { alive = false }
   }, [start, end, people, selectedIds])
+
+  // Calcular distribución de huéspedes y mascotas por habitación
+  const roomsWithDistribution = useMemo(() => {
+    return rooms.map((room) => {
+    const capacity = room.capacity ?? 0
+    
+    // Cada habitación puede alojar hasta su capacidad o el total de personas buscadas
+    const peopleForThisRoom = Math.min(capacity, adults + kids)
+
+    // Distribución independiente para esta habitación
+    const adultsInRoom = Math.min(adults, peopleForThisRoom)
+    const remainingCapacityAfterAdults = peopleForThisRoom - adultsInRoom
+    const kidsInRoom = Math.min(kids, remainingCapacityAfterAdults)
+    
+    // Las mascotas se asignan independientemente (hasta la capacidad de la habitación)
+    const petsInRoom = Math.min(pets, capacity)
+
+    const priceCalc = calculateRoomPrice(
+      Number(room.price ?? 0),
+      adultsInRoom,
+      kidsInRoom,
+      petsInRoom
+    )
+
+      return {
+        ...room,
+        adultsInRoom,
+        kidsInRoom,
+        petsInRoom,
+        priceCalc,
+        roomPricePerNight: priceCalc.total,
+      }
+    })
+  }, [rooms, adults, kids, pets])
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
@@ -120,7 +143,6 @@ function SearchResults() {
           <h1 className="font-serif text-2xl font-bold text-foreground md:text-3xl">
             Resultados de Búsqueda
           </h1>
-
           <button
             onClick={() => setEditingSearch(!editingSearch)}
             className="text-sm text-accent hover:underline"
@@ -140,36 +162,26 @@ function SearchResults() {
           </p>
         ) : (
           <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
-            
-            {/* LLEGADA */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground">Llegada</label>
               <span className="text-[10px] text-muted-foreground/70 invisible">.</span>
               <input
                 type="date"
                 value={localSearch.start}
-                onChange={(e) =>
-                  setLocalSearch((prev) => ({ ...prev, start: e.target.value }))
-                }
+                onChange={(e) => setLocalSearch((prev) => ({ ...prev, start: e.target.value }))}
                 className="rounded-xl border px-3 py-2 text-sm"
               />
             </div>
-
-            {/* SALIDA */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground">Salida</label>
               <span className="text-[10px] text-muted-foreground/70 invisible">.</span>
               <input
                 type="date"
                 value={localSearch.end}
-                onChange={(e) =>
-                  setLocalSearch((prev) => ({ ...prev, end: e.target.value }))
-                }
+                onChange={(e) => setLocalSearch((prev) => ({ ...prev, end: e.target.value }))}
                 className="rounded-xl border px-3 py-2 text-sm"
               />
             </div>
-
-            {/* ADULTOS */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground">Adultos</label>
               <span className="text-[10px] text-muted-foreground/70">9 años o más</span>
@@ -177,14 +189,10 @@ function SearchResults() {
                 type="number"
                 min={1}
                 value={localSearch.adults}
-                onChange={(e) =>
-                  setLocalSearch((prev) => ({ ...prev, adults: Number(e.target.value) }))
-                }
+                onChange={(e) => setLocalSearch((prev) => ({ ...prev, adults: Number(e.target.value) }))}
                 className="rounded-xl border px-3 py-2 text-sm"
               />
             </div>
-
-            {/* NIÑOS */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground">Niños</label>
               <span className="text-[10px] text-muted-foreground/70">De 5 a 8 años</span>
@@ -192,14 +200,10 @@ function SearchResults() {
                 type="number"
                 min={0}
                 value={localSearch.kids}
-                onChange={(e) =>
-                  setLocalSearch((prev) => ({ ...prev, kids: Number(e.target.value) }))
-                }
+                onChange={(e) => setLocalSearch((prev) => ({ ...prev, kids: Number(e.target.value) }))}
                 className="rounded-xl border px-3 py-2 text-sm"
               />
             </div>
-
-            {/* BEBÉS */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground">Bebés</label>
               <span className="text-[10px] text-muted-foreground/70">Menos de 5 años</span>
@@ -207,14 +211,10 @@ function SearchResults() {
                 type="number"
                 min={0}
                 value={localSearch.babies}
-                onChange={(e) =>
-                  setLocalSearch((prev) => ({ ...prev, babies: Number(e.target.value) }))
-                }
+                onChange={(e) => setLocalSearch((prev) => ({ ...prev, babies: Number(e.target.value) }))}
                 className="rounded-xl border px-3 py-2 text-sm"
               />
             </div>
-
-            {/* MASCOTAS */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground">Mascotas</label>
               <span className="text-[10px] text-muted-foreground/70 invisible">.</span>
@@ -222,17 +222,10 @@ function SearchResults() {
                 type="number"
                 min={0}
                 value={localSearch.pets}
-                onChange={(e) =>
-                  setLocalSearch((prev) => ({
-                    ...prev,
-                    pets: Number(e.target.value),
-                  }))
-                }
+                onChange={(e) => setLocalSearch((prev) => ({ ...prev, pets: Number(e.target.value) }))}
                 className="rounded-xl border px-3 py-2 text-sm"
               />
             </div>
-
-            {/* BOTÓN */}
             <div className="flex items-end">
               <Button
                 onClick={() => {
@@ -244,7 +237,6 @@ function SearchResults() {
                     babies: Number(localSearch.babies),
                     pets: Number(localSearch.pets),
                   })
-
                   const params = new URLSearchParams({
                     start: localSearch.start,
                     end: localSearch.end,
@@ -255,7 +247,6 @@ function SearchResults() {
                     remaining: "0",
                     returnTo,
                   })
-
                   window.location.href = `/search?${params.toString()}`
                 }}
                 className="w-full rounded-xl bg-accent text-accent-foreground"
@@ -290,9 +281,7 @@ function SearchResults() {
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <SearchX className="h-16 w-16 text-muted-foreground/40 mb-4" />
           <h2 className="text-xl font-bold text-foreground">No se encontraron habitaciones</h2>
-          <p className="mt-2 text-muted-foreground">
-            Intenta modificar tus criterios de búsqueda.
-          </p>
+          <p className="mt-2 text-muted-foreground">Intenta modificar tus criterios de búsqueda.</p>
           <Link href="/">
             <Button className="mt-6 bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl">
               Nueva búsqueda
@@ -307,30 +296,19 @@ function SearchResults() {
             Aún faltan {remaining} persona{remaining === 1 ? "" : "s"} por acomodar
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Selecciona otra habitación para completar tu reserva y continuar a servicios adicionales.
+            Selecciona otra habitación para completar tu reserva.
           </p>
         </div>
       )}
 
-      {!loading && !error && rooms.length > 0 && (
+      {/* ✅ CAMBIO: Usar roomsWithDistribution en lugar de rooms */}
+      {!loading && !error && roomsWithDistribution.length > 0 && (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {rooms.map((room) => {
+          {roomsWithDistribution.map((room) => {
             const img = room.images?.[0]?.url || "/placeholder.svg"
-
-            // Calcular cuántas personas van en esta habitación
-            const peopleForThisRoom = Math.min(room.capacity ?? 0, people)
-
-            // Distribuir adultos y niños en esta habitación
-            const adultsInRoom = Math.min(adults, peopleForThisRoom)
-            const remainingCapacity = peopleForThisRoom - adultsInRoom
-            const kidsInRoom = Math.min(kids, remainingCapacity)
-
-            // Calcular precio con descuento para niños
-            const priceCalc = calculateRoomPrice(
-              Number(room.price ?? 0),
-              adultsInRoom,
-              kidsInRoom
-            )
+            
+            // ✅ Usar valores precalculados
+            const { adultsInRoom, kidsInRoom, petsInRoom, priceCalc, roomPricePerNight } = room
 
             return (
               <div
@@ -350,35 +328,35 @@ function SearchResults() {
                     <Badge variant="secondary" className="capitalize text-xs">{room.type}</Badge>
                     <div className="text-right">
                       <span className="text-xl font-bold text-foreground">
-                        ${priceCalc.total.toLocaleString()}
+                        ${roomPricePerNight.toLocaleString()}
                       </span>
-                      <p className="text-xs text-muted-foreground">
-                        / noche
-                      </p>
+                      <p className="text-xs text-muted-foreground">/ noche</p>
 
-                      {/* Desglose visual del precio */}
-                    <div className="mt-1 text-[10px] text-muted-foreground space-y-0.5">
-                      {adultsInRoom > 0 && (
-                        <p>
-                          {adultsInRoom} adulto{adultsInRoom > 1 ? "s" : ""} × ${Number(room.price).toLocaleString()} = ${(priceCalc.adultsPrice).toLocaleString()}
-                        </p>
-                      )}
-                      {kidsInRoom > 0 && (
-                        <p className="text-emerald-600 font-medium">
-                          {kidsInRoom} niño{kidsInRoom > 1 ? "s" : ""} × ${(Number(room.price) * 0.5).toLocaleString()} = ${priceCalc.kidsPrice.toLocaleString()}
-                        </p>
-                      )}
-                      {priceCalc.kidsDiscount > 0 && (
-                        <p className="text-emerald-600">
-                          Descuento niños: -${priceCalc.kidsDiscount.toLocaleString()}
-                        </p>
-                      )}
+                      {/* ✅ Desglose visual del precio con mascotas */}
+                      <div className="mt-1 text-[10px] text-muted-foreground space-y-0.5">
+                        {adultsInRoom > 0 && (
+                          <p>
+                            {adultsInRoom} adulto{adultsInRoom > 1 ? "s" : ""} × ${Number(room.price).toLocaleString()} = ${priceCalc.adultsPrice.toLocaleString()}
+                          </p>
+                        )}
+                        {kidsInRoom > 0 && (
+                          <p className="text-emerald-600 font-medium">
+                            {kidsInRoom} niño{kidsInRoom > 1 ? "s" : ""} × ${(Number(room.price) * 0.5).toLocaleString()} = ${priceCalc.kidsPrice.toLocaleString()}
+                          </p>
+                        )}
+                        {petsInRoom > 0 && (
+                          <p className="text-amber-600 font-medium">
+                            {petsInRoom} mascota{petsInRoom > 1 ? "s" : ""} × $20.000 = ${priceCalc.petsPrice.toLocaleString()}
+                          </p>
+                        )}
+                        {priceCalc.kidsDiscount > 0 && (
+                          <p className="text-emerald-600">
+                            Descuento niños: -${priceCalc.kidsDiscount.toLocaleString()}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-
-
-
 
                   <h3 className="text-lg font-bold text-card-foreground">
                     Hab. {room.nameRoom}
@@ -392,7 +370,6 @@ function SearchResults() {
                     <span className="flex items-center gap-1">
                       <Users className="h-4 w-4" /> {room.capacity} pers.
                     </span>
-
                     <span className="flex items-center gap-1">
                       <Bed className="h-4 w-4" />
                       {room.singleBeds > 0 ? `${room.singleBeds} sencilla${room.singleBeds > 1 ? "s" : ""}` : ""}
@@ -401,26 +378,33 @@ function SearchResults() {
                     </span>
                   </div>
 
-                  {/* Badge de descuento si hay niños */}
-                  {kidsInRoom > 0 && (
-                    <div className="mt-2">
-                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-xs">
-                        ✓ Descuento de niños aplicado
-                      </Badge>
+                  {/* ✅ Badges de descuentos y mascotas */}
+                  {(kidsInRoom > 0 || petsInRoom > 0) && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {kidsInRoom > 0 && (
+                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-xs">
+                          ✓ Descuento niños
+                        </Badge>
+                      )}
+                      {petsInRoom > 0 && (
+                        <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs">
+                          +${priceCalc.petsPrice.toLocaleString()} mascotas
+                        </Badge>
+                      )}
                     </div>
                   )}
 
                   <div className="mt-auto pt-4">
-                  <Link
-                    href={`/rooms/${room.id}?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}&remaining=${remaining}&returnTo=${returnTo}`}
-                    className="mt-4 block"
-                  >
-                    <Button className="w-full rounded-xl bg-accent text-accent-foreground hover:bg-accent/90 font-semibold">
-                      Ver Detalles
-                    </Button>
-                  </Link>
+                    <Link
+                      href={`/rooms/${room.id}?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}&remaining=${remaining}&returnTo=${returnTo}`}
+                      className="mt-4 block"
+                    >
+                      <Button className="w-full rounded-xl bg-accent text-accent-foreground hover:bg-accent/90 font-semibold">
+                        Ver Detalles
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
-              </div>
               </div>
             )
           })}
