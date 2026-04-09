@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Eye, Filter } from "lucide-react"
+import { Eye, Filter, Phone } from 'lucide-react';
 import { authStorage } from "@/lib/auth-storage"
 
 import {
@@ -212,6 +212,7 @@ export default function AdminReservationsPage() {
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="pb-3 pr-4 font-medium">Nro Reserva</th>
                 <th className="pb-3 pr-4 font-medium">Huésped</th>
+                <th className="pb-3 pr-4 font-medium">Teléfono</th>
                 <th className="pb-3 pr-4 font-medium">Habitación/Servicio</th>
                 <th className="pb-3 pr-4 font-medium">Fechas</th>
                 <th className="pb-3 pr-4 font-medium">Total</th>
@@ -230,6 +231,9 @@ export default function AdminReservationsPage() {
                     </td>
                     <td className="py-3 pr-4 text-foreground">
                       {res.client?.fullName || res.client?.documentNumber || "Sin nombre"}
+                    </td>
+                    <td className="py-3 pr-4 text-foreground">
+                      {res.client?.documentNumber || "Sin teléfono"}
                     </td>
                     <td className="py-3 pr-4 text-muted-foreground">{detailLabel}</td>
                     <td className="py-3 pr-4 text-xs text-muted-foreground">
