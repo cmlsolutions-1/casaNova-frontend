@@ -14,19 +14,31 @@ import { cn } from "@/lib/utils"
 
 const ACCENT_COLOR = "#f4c048"
 
+// Extraer capacidad del nombre para EVENT_HALL
+function getEventHallCapacity(serviceName: string): number {
+  const match = serviceName.match(/(\d+)\s*(personas|personas?)/i)
+  if (match && match[1]) {
+    return parseInt(match[1], 10)
+  }
+  return 150 // valor por defecto
+}
+
+// Meta información corregida
 function getExtraServiceMeta(service: BackendService) {
   const name = service.name.toLowerCase()
 
   if (name.includes("salon") || name.includes("salón")) {
+    const capacity = getEventHallCapacity(service.name)
     return {
       kind: "EVENT_HALL" as const,
       icon: PartyPopper,
-      peopleText: "Máximo 150 personas",
+      peopleText: `Capacidad: ${capacity} personas`,
       extra: "Horario: 6:00 pm a 3:00 am",
       fallbackImage: "/salon-eventos.jpg",
     }
   }
 
+  // DAY_PASS
   return {
     kind: "DAY_PASS" as const,
     icon: SunMedium,
@@ -82,15 +94,11 @@ export function ServicesOtherDay() {
   const prevSlide = useCallback(() => goToSlide(currentSlide - 1), [currentSlide, goToSlide])
   const nextSlide = useCallback(() => goToSlide(currentSlide + 1), [currentSlide, goToSlide])
 
-  // ✅ CORREGIDO: Ignorar arrastre si el clic es en elementos interactivos
   const handleMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
-    
-    // No iniciar drag si se hace clic en botones, enlaces o inputs
     if (target.closest("button") || target.closest("a") || target.closest("input")) {
       return
     }
-    
     if (!carouselRef.current) return
     setIsDragging(true)
     setStartX(e.pageX - carouselRef.current.offsetLeft)
@@ -178,7 +186,6 @@ export function ServicesOtherDay() {
             </div>
           </div>
 
-          {/* ✅ Botón con asChild y stopPropagation para asegurar navegación */}
           <Button 
             asChild 
             className="mt-4 w-full rounded-xl font-semibold transition-all hover:opacity-90"

@@ -13,21 +13,31 @@ import {
   type BackendService,
 } from "@/services/service.service"
 
-// Configuración de precios y límites
+// Configuración DAY_PASS
 const DAY_PASS_MIN_PEOPLE = 10
 const DAY_PASS_MAX_PEOPLE = 100
-const DAY_PASS_PRICE_PER_PERSON = 25000 // $25.000 por persona
+const DAY_PASS_PRICE_PER_PERSON = 25000
 
-const EVENT_HALL_MAX_PEOPLE = 150
+// Configuración EVENT_HALL
+const EVENT_HALL_DEFAULT_CAPACITY = 150
 
+// Detectar tipo de servicio
 function getExtraServiceKind(serviceName: string): "DAY_PASS" | "EVENT_HALL" {
   const name = serviceName.toLowerCase()
-
   if (name.includes("salon") || name.includes("salón")) {
     return "EVENT_HALL"
   }
-
   return "DAY_PASS"
+}
+
+// Extraer capacidad del nombre del servicio (ej: "Salón 100 personas" → 100)
+function getEventHallCapacity(serviceName: string): number {
+  const match = serviceName.match(/(\d+)\s*(personas|personas?)/i)
+  if (match && match[1]) {
+    return parseInt(match[1], 10)
+  }
+  // Si no encuentra número, usar valor por defecto
+  return EVENT_HALL_DEFAULT_CAPACITY
 }
 
 export default function ExtraServiceBookingPage() {
@@ -42,6 +52,16 @@ export default function ExtraServiceBookingPage() {
   const [date, setDate] = useState("")
   const [people, setPeople] = useState(DAY_PASS_MIN_PEOPLE)
   const [error, setError] = useState("")
+
+  // Capacidad fija para EVENT_HALL (extraída del nombre)
+  const eventHallCapacity = useMemo(() => {
+    if (!service) return EVENT_HALL_DEFAULT_CAPACITY
+    const kind = getExtraServiceKind(service.name)
+    if (kind === "EVENT_HALL") {
+      return getEventHallCapacity(service.name)
+    }
+    return EVENT_HALL_DEFAULT_CAPACITY
+  }, [service])
 
   useEffect(() => {
     let alive = true
@@ -61,8 +81,12 @@ export default function ExtraServiceBookingPage() {
 
         if (found) {
           const kind = getExtraServiceKind(found.name)
-          // Iniciar con mínimo 10 personas para DAY_PASS
-          setPeople(kind === "DAY_PASS" ? DAY_PASS_MIN_PEOPLE : 1)
+          if (kind === "DAY_PASS") {
+            setPeople(DAY_PASS_MIN_PEOPLE)
+          } else {
+            // Para EVENT_HALL, usar la capacidad fija del servicio
+            setPeople(getEventHallCapacity(found.name))
+          }
         }
       } catch {
         if (!alive) return
@@ -79,12 +103,12 @@ export default function ExtraServiceBookingPage() {
 
   const kind = service ? getExtraServiceKind(service.name) : null
 
-  // ✅ Cálculo corregido: Total = personas × precio por persona
+  // Cálculo del total
   const total = useMemo(() => {
     if (!service || !kind) return 0
 
     if (kind === "DAY_PASS") {
-      // El precio es por persona: Total = personas × $25.000
+      // DAY_PASS: personas × $25.000
       return people * DAY_PASS_PRICE_PER_PERSON
     }
 
@@ -92,7 +116,7 @@ export default function ExtraServiceBookingPage() {
     return Number(service.price)
   }, [service, kind, people])
 
-  // Desglose del precio para DAY_PASS
+  // Desglose para DAY_PASS
   const priceBreakdown = useMemo(() => {
     if (!service || kind !== "DAY_PASS") return null
 
@@ -138,10 +162,7 @@ export default function ExtraServiceBookingPage() {
       }
     }
 
-    if (kind === "EVENT_HALL" && people > EVENT_HALL_MAX_PEOPLE) {
-      setError(`El salón de eventos permite máximo ${EVENT_HALL_MAX_PEOPLE} personas.`)
-      return
-    }
+    // EVENT_HALL no necesita validación de personas (es fija)
 
     setExtraBooking({
       serviceId: service.id,
@@ -178,6 +199,7 @@ export default function ExtraServiceBookingPage() {
         <CardContent className="p-6">
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-5">
+              {/* Fecha */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-foreground">
                   Fecha de reserva
@@ -193,52 +215,64 @@ export default function ExtraServiceBookingPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-foreground">
-                  Cantidad de personas
-                </label>
-                <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Users className="h-4 w-4 text-accent" />
-                    <span>{people} personas</span>
-                  </div>
+              {/* Selector de personas SOLO para DAY_PASS */}
+              {kind === "DAY_PASS" && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-foreground">
+                    Cantidad de personas
+                  </label>
+                  <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Users className="h-4 w-4 text-accent" />
+                      <span>{people} personas</span>
+                    </div>
 
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPeople((prev) =>
-                          Math.max(kind === "DAY_PASS" ? DAY_PASS_MIN_PEOPLE : 1, prev - 1)
-                        )
-                      }
-                      className="flex h-8 w-8 items-center justify-center rounded-full border border-border hover:bg-secondary"
-                    >
-                      <Minus className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPeople((prev) => Math.max(DAY_PASS_MIN_PEOPLE, prev - 1))
+                        }
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-border hover:bg-secondary"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPeople((prev) =>
-                          Math.min(
-                            kind === "DAY_PASS" ? DAY_PASS_MAX_PEOPLE : EVENT_HALL_MAX_PEOPLE,
-                            prev + 1
-                          )
-                        )
-                      }
-                      className="flex h-8 w-8 items-center justify-center rounded-full border border-border hover:bg-secondary"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPeople((prev) => Math.min(DAY_PASS_MAX_PEOPLE, prev + 1))
+                        }
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-border hover:bg-secondary"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-                
-                {kind === "DAY_PASS" && (
+                  
                   <p className="mt-2 text-xs text-muted-foreground">
                     Mínimo {DAY_PASS_MIN_PEOPLE} personas | Máximo {DAY_PASS_MAX_PEOPLE} personas | ${DAY_PASS_PRICE_PER_PERSON.toLocaleString()} por persona
                   </p>
-                )}
-              </div>
+                </div>
+              )}
+
+              {/* Para EVENT_HALL mostrar capacidad fija (sin selector) */}
+              {kind === "EVENT_HALL" && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-foreground">
+                    Capacidad del salón
+                  </label>
+                  <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-4 py-3">
+                    <Users className="h-4 w-4 text-accent" />
+                    <span className="text-sm font-medium text-foreground">
+                      {eventHallCapacity} personas (capacidad fija)
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Este salón tiene capacidad fija para {eventHallCapacity} personas. No es posible modificar la cantidad.
+                  </p>
+                </div>
+              )}
 
               {error && (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">
@@ -247,6 +281,7 @@ export default function ExtraServiceBookingPage() {
               )}
             </div>
 
+            {/* Resumen */}
             <div className="rounded-2xl bg-secondary/50 p-5">
               <h2 className="mb-4 font-serif text-xl font-bold text-foreground">
                 Resumen
@@ -293,14 +328,14 @@ export default function ExtraServiceBookingPage() {
                 {kind === "EVENT_HALL" && (
                   <>
                     <div className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">Condición</span>
+                      <span className="text-muted-foreground">Capacidad</span>
                       <span className="font-medium text-foreground">
-                        Máximo {EVENT_HALL_MAX_PEOPLE} personas
+                        {eventHallCapacity} personas
                       </span>
                     </div>
                     <div className="flex justify-between gap-4">
                       <span className="text-muted-foreground">Horario</span>
-                      <span className="font-medium text-foreground">7:00 pm a 2:30 am</span>
+                      <span className="font-medium text-foreground">6:00 pm a 3:00 am</span>
                     </div>
                   </>
                 )}

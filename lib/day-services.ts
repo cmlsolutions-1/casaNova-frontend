@@ -32,7 +32,7 @@ export const EXTRA_BOOKING_OPTIONS: Record<ExtraBookingType, ExtraBookingConfig>
       "Reserva nuestro salón social para celebraciones, reuniones y eventos especiales.",
     basePrice: 2000000,
     maxPeople: 150,
-    schedule: "7:00 pm a 2:30 am",
+    schedule: "6:00 pm a 3:00 am",
     serviceId: "EVENT_HALL_SERVICE",
   },
 }
