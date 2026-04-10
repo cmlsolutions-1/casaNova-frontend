@@ -283,9 +283,23 @@ export default function BookingSuccessPage() {
             </div>
 
             <div className="flex justify-between gap-2">
-              <span className="text-muted-foreground">Nro de Personas</span>
+              <span className="text-muted-foreground">Adultos</span>
               <span className="text-foreground text-right">
                 {firstRoom?.numberOfPeople || "-"}
+              </span>
+            </div>
+
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Niños</span>
+              <span className="text-foreground text-right">
+                {firstRoom?.children || "-"}
+              </span>
+            </div>
+
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Mascotas</span>
+              <span className="text-foreground text-right">
+                {firstRoom?.pets || "-"}
               </span>
             </div>
 

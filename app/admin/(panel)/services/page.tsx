@@ -1,4 +1,4 @@
-// app/admin/(panel)/services/page.tsx
+// app/admin/(panel)/services/page.tsX
 "use client"
 
 import React, { useEffect, useMemo, useRef, useState } from "react"
@@ -28,6 +28,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Pencil, Upload, X, Loader2 } from "lucide-react"
 import { formatCurrencyCOP } from "@/utils/format"
 import { DialogDescription } from "@/components/ui/dialog"
+
+
 
 function normalizeService(s: any): BackendService {
   return {

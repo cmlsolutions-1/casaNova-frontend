@@ -425,8 +425,8 @@ export default function BookingConfirmPage() {
           {
             serviceId: extraBooking.serviceId,
             amount: extraBooking.people,
-            startAt: startAt.toISOString(), // ✅ Horario real del servicio
-            endAt: endAt.toISOString(),     // ✅ Horario real del servicio
+            startAt: startAt.toISOString(), //  Horario real del servicio
+            endAt: endAt.toISOString(),     // Horario real del servicio
           },
         ],
       }

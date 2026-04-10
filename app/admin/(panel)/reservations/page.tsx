@@ -214,6 +214,9 @@ export default function AdminReservationsPage() {
                 <th className="pb-3 pr-4 font-medium">Huésped</th>
                 <th className="pb-3 pr-4 font-medium">Teléfono</th>
                 <th className="pb-3 pr-4 font-medium">Habitación/Servicio</th>
+                <th className="pb-3 pr-4 font-medium">Adultos</th>
+                <th className="pb-3 pr-4 font-medium">Niños</th>
+                <th className="pb-3 pr-4 font-medium">Mascotas</th>
                 <th className="pb-3 pr-4 font-medium">Fechas</th>
                 <th className="pb-3 pr-4 font-medium">Total</th>
                 <th className="pb-3 pr-4 font-medium">Estado</th>
@@ -236,6 +239,15 @@ export default function AdminReservationsPage() {
                       {res.client?.phone || "Sin teléfono"}
                     </td>
                     <td className="py-3 pr-4 text-muted-foreground">{detailLabel}</td>
+                    <td className="py-3 pr-4 text-foreground">
+                      {res.rooms?.[0]?.numberOfPeople || "n/a"}
+                    </td>
+                    <td className="py-3 pr-4 text-foreground">
+                      {res.rooms?.[0]?.children || "n/a"}
+                    </td>
+                    <td className="py-3 pr-4 text-foreground">
+                      {res.rooms?.[0]?.pets || "n/a"}
+                    </td>
                     <td className="py-3 pr-4 text-xs text-muted-foreground">
                       {formatDateSpanish(res.startDate)} - {formatDateSpanish(res.endDate)}
                     </td>
@@ -344,6 +356,28 @@ export default function AdminReservationsPage() {
                   </ul>
                 </div>
               ) : null}
+
+              <div>
+                  <p className="text-muted-foreground">Adultos</p>
+                  <p className="text-foreground">
+                    {selectedRes.rooms?.[0]?.numberOfPeople || "No disponible"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-muted-foreground">Niños</p>
+                  <p className="text-foreground">
+                    {selectedRes.rooms?.[0]?.children || "No disponible"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-muted-foreground">Mascotas</p>
+                  <p className="text-foreground">
+                    {selectedRes.rooms?.[0]?.pets || "No disponible"}
+                  </p>
+                </div>
+
 
               <div className="border-t border-border pt-2">
                 <div className="flex justify-between">

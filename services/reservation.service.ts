@@ -49,6 +49,9 @@ export type ReservationRoom = {
   nameRoom: string
   price: number
   numberOfPeople: string | number
+  children: string | number
+  babys: string | number
+  pets: string | number
   images: ReservationImage[] | string[]
 }
 
