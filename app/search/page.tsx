@@ -27,7 +27,7 @@ function SearchResults() {
   const pets = Number(searchParams.get("pets")) || 0
   const remaining = Number(searchParams.get("remaining")) || 0
 
-  const totalPeople = adults + kids + babies
+  const totalPeople = adults + kids
   const people = remaining > 0 ? remaining : totalPeople
 
   const [rooms, setRooms] = useState<BackendRoom[]>([])

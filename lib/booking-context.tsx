@@ -455,21 +455,31 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
     const setExtraBooking = useCallback((data: ExtraBookingSelection) => {
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString() // 15 minutos
     setBooking((prev) => ({
       ...prev,
       searchParams: null,
       selectedRooms: [],
       selectedServices: [],
       extraBooking: data,
+      expiresAt,
     }))
   }, [])
 
   const clearExtraBooking = useCallback(() => {
-    setBooking((prev) => ({
+  setBooking((prev) => {
+    // Si solo había extraBooking, limpiamos todo
+    if (!prev.guestInfo && !prev.selectedRooms.length) {
+      return defaultBooking
+    }
+    // Si hay otros datos, solo limpiamos extraBooking y expiresAt
+    return {
       ...prev,
       extraBooking: null,
-    }))
-  }, [])
+      expiresAt: null,
+    }
+  })
+}, [])
 
   return (
     <BookingContext.Provider

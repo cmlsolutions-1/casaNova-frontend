@@ -261,7 +261,7 @@ export default function BookingConfirmPage() {
     ? Number(extraBooking?.totalPrice ?? 0)
     : roomsTotal + svcTotal
 
-  const totalPeople = sp ? sp.adults + sp.kids + sp.babies : 0
+  const totalPeople = sp ? sp.adults + sp.kids : 0
   const capacityTotal = selectedRooms.reduce(
     (sum: number, r: any) => sum + (r.capacity ?? 0),
     0,
@@ -270,7 +270,7 @@ export default function BookingConfirmPage() {
   const canProceedToPay = acceptedTerms && acceptedMinorsPolicy && !paying
 
   const totalGuestsNeeded =
-  Number(sp?.adults ?? 0) + Number(sp?.kids ?? 0) + Number(sp?.babies ?? 0)
+  Number(sp?.adults ?? 0) + Number(sp?.kids ?? 0)
 
   const currentTempCapacity = tempSelectedRooms.reduce(
     (sum, room) => sum + Number(room.capacity ?? 0),
@@ -289,7 +289,10 @@ export default function BookingConfirmPage() {
       ...prev,
       {
         ...room,
-        selectedPeople: Number(room.capacity ?? 0),
+        selectedPeople: Math.min(
+          Number(room.capacity ?? 0),
+          Number(sp?.adults ?? 0) + Number(sp?.kids ?? 0)
+        ),
         selectedPricePerNight: Number(room.price ?? 0) * Number(room.capacity ?? 0),
       },
     ])
@@ -299,7 +302,7 @@ export default function BookingConfirmPage() {
     if (!sp) return
 
     const neededGuests =
-      Number(sp.adults ?? 0) + Number(sp.kids ?? 0) + Number(sp.babies ?? 0)
+      Number(sp.adults ?? 0) + Number(sp.kids ?? 0)
 
     const capacity = tempSelectedRooms.reduce(
       (sum, room) => sum + Number(room.capacity ?? 0),
@@ -536,8 +539,8 @@ export default function BookingConfirmPage() {
       }
     }
 
-    if (remainingAdults > 0 || remainingKids > 0 || remainingBabies > 0) {
-      const totalNeeded = sp.adults + sp.kids + sp.babies
+    if (remainingAdults > 0 || remainingKids > 0) {
+      const totalNeeded = sp.adults + sp.kids
       const totalCapacity = selectedRooms.reduce(
         (sum: number, r: any) => sum + Number(r.capacity ?? 0),
         0
@@ -1173,7 +1176,7 @@ export default function BookingConfirmPage() {
                     const img = room.images?.[0]?.url || "/placeholder.svg"
                     const peopleForThisRoom = Math.min(
                       Number(room.capacity ?? 0),
-                      Number(sp?.adults ?? 0) + Number(sp?.kids ?? 0) + Number(sp?.babies ?? 0),
+                      Number(sp?.adults ?? 0) + Number(sp?.kids ?? 0),
                     )
                     const roomPricePerNight = Number(room.price ?? 0) * peopleForThisRoom
                     const isSelected = tempSelectedRooms.some((r) => r.id === room.id)
@@ -1236,7 +1239,7 @@ export default function BookingConfirmPage() {
                         0,
                       )}
                     </span>{" "}
-                    / {Number(sp?.adults ?? 0) + Number(sp?.kids ?? 0) + Number(sp?.babies ?? 0)} huéspedes
+                    / {Number(sp?.adults ?? 0) + Number(sp?.kids ?? 0)} huéspedes
                   </div>
 
                   <Button

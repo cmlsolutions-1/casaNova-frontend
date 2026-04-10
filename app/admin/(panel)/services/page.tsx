@@ -286,7 +286,7 @@ function ServiceForm({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="FIXED">Fijo</SelectItem>
-            <SelectItem value="HOURLY">Por hora</SelectItem>
+            <SelectItem value="HOURLY">Hora/Cantidad</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -590,7 +590,7 @@ export default function AdminServicesPage() {
               <CardContent className="space-y-2 p-4">
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline" className="text-xs">
-                    {svc.billingType === "HOURLY" ? "Por hora" : "Fijo"}
+                    {svc.billingType === "HOURLY" ? "Hora/Cantidad" : "Fijo"}
                   </Badge>
 
                   <Badge variant="secondary" className="text-xs">
