@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { XCircle } from 'lucide-react';
+import { XCircle, Home } from 'lucide-react';
+import { Button } from "@/components/ui/button"
+
 
 export default function BookingFailurePage() {
   const searchParams = useSearchParams();
@@ -49,9 +51,11 @@ export default function BookingFailurePage() {
 
         <Link
           href="/"
-          className="mt-8 inline-flex items-center justify-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
-        >
-          Volver al inicio
+          >
+          <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90 mt-2">
+              <Home className="mr-2 h-4 w-4" />
+                Volver al inicio
+          </Button>
         </Link>
       </div>
     </main>

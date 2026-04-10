@@ -73,7 +73,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
   const babies = Number(searchParams.get("babies")) || booking.searchParams?.babies || 0
   const pets = Number(searchParams.get("pets")) || booking.searchParams?.pets || 0
 
-  const totalRequestedPeople = Number(adults) + Number(kids) + Number(babies)
+  const totalRequestedPeople = Number(adults) + Number(kids)
 
   const prevCapacity = (booking.selectedRooms ?? []).reduce((sum, r: any) => {
     return sum + Number(r?.capacity ?? 0)
@@ -118,7 +118,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
     }
 
     // Calcula TODO como number (evita strings del storage)
-    const requiredPeople = Number(adults) + Number(kids) + Number(babies)
+    const requiredPeople = Number(adults) + Number(kids)
 
     const isReplacing = returnTo === "confirm"
 

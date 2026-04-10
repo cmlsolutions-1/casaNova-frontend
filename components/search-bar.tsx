@@ -101,7 +101,7 @@ export function SearchBar() {
     router.push(`/search?${query.toString()}`)
   }
 
-  const totalGuests = adults + kids + babies
+  const totalGuests = adults + kids
 
   const handleSelectStartDate = (date: Date | undefined) => {
     if (!date) return
