@@ -13,6 +13,8 @@ import {
   type BackendService,
 } from "@/services/service.service"
 
+import { DescriptionParser } from "@/components/description-parser"
+
 // Configuración DAY_PASS
 const DAY_PASS_MIN_PEOPLE = 10
 const DAY_PASS_MAX_PEOPLE = 100
@@ -190,9 +192,12 @@ export default function ExtraServiceBookingPage() {
         <h1 className="font-serif text-3xl font-bold text-foreground md:text-4xl">
           {service.name}
         </h1>
-        <p className="mt-3 max-w-2xl text-muted-foreground">
-          {service.description || service.decription}
-        </p>
+        <div className="mt-4 max-w-2xl">
+          <DescriptionParser 
+            text={service.decription || ""} 
+            className="max-w-2xl"
+          />
+        </div>
       </div>
 
       <Card className="border-border shadow-lg">

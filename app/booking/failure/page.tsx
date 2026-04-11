@@ -1,13 +1,14 @@
+// app/booking/failure/page.tsx
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { XCircle, Home } from 'lucide-react';
 import { Button } from "@/components/ui/button"
 
-
-export default function BookingFailurePage() {
+// Componente hijo que usa useSearchParams
+function BookingFailureContent() {
   const searchParams = useSearchParams();
 
   const data = useMemo(() => {
@@ -25,7 +26,7 @@ export default function BookingFailurePage() {
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
         <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600">
-            <XCircle className="h-10 w-10" />
+          <XCircle className="h-10 w-10" />
         </div>
 
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
@@ -38,26 +39,37 @@ export default function BookingFailurePage() {
         </p>
 
         {data.reservationId && (
-        <div className="mt-4 space-y-1">
+          <div className="mt-4 space-y-1">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-            Reserva
+              Reserva
             </p>
             <p className="text-sm font-medium text-slate-700 break-all">
-            {data.reservationId}
+              {data.reservationId}
             </p>
             <p className="text-xs text-red-500">No efectuada</p>
-        </div>
+          </div>
         )}
 
-        <Link
-          href="/"
-          >
+        <Link href="/">
           <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90 mt-2">
-              <Home className="mr-2 h-4 w-4" />
-                Volver al inicio
+            <Home className="mr-2 h-4 w-4" />
+            Volver al inicio
           </Button>
         </Link>
       </div>
     </main>
+  );
+}
+
+// Página principal con Suspense
+export default function BookingFailurePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <p className="text-slate-500">Cargando...</p>
+      </div>
+    }>
+      <BookingFailureContent />
+    </Suspense>
   );
 }
