@@ -16,8 +16,15 @@ import {
 import { formatCurrencyCOP } from "@/utils/format"
 import { formatDateSpanish } from "@/utils/date"
 
+import { listRoomsService, type BackendRoom } from "@/services/room.service"
+
 export default function AdminDashboard() {
-  const { rooms, adminAuth } = useBooking()
+  const { adminAuth } = useBooking()
+
+  // Estado local para habitaciones
+  const [rooms, setRooms] = useState<BackendRoom[]>([])
+  const [loadingRooms, setLoadingRooms] = useState(false)
+  const [roomsError, setRoomsError] = useState<string | null>(null)
 
   const [services, setServices] = useState<BackendService[]>([])
   const [servicesError, setServicesError] = useState<string | null>(null)
@@ -26,6 +33,38 @@ export default function AdminDashboard() {
   const [reservationsError, setReservationsError] = useState<string | null>(null)
   const [loadingReservations, setLoadingReservations] = useState(false)
 
+  // Fetch de habitaciones
+  useEffect(() => {
+    let alive = true
+
+    ;(async () => {
+      try {
+        setLoadingRooms(true)
+        
+        // listRoomsService devuelve BackendRoom[] directamente
+        const roomsData = await listRoomsService()
+
+        if (!Array.isArray(roomsData)) {
+          throw new Error("No se pudieron cargar las habitaciones")
+        }
+
+        if (alive) setRooms(roomsData)
+      } catch (e: any) {
+        if (alive) {
+          setRoomsError(e?.message ?? "Error cargando habitaciones")
+          setRooms([])
+        }
+      } finally {
+        if (alive) setLoadingRooms(false)
+      }
+    })()
+
+    return () => {
+      alive = false
+    }
+  }, [])
+
+// Fetch de servicios
   useEffect(() => {
     let alive = true
 
@@ -46,6 +85,7 @@ export default function AdminDashboard() {
     }
   }, [])
 
+  // Fetch de reservas
   useEffect(() => {
     let alive = true
 
@@ -77,6 +117,11 @@ export default function AdminDashboard() {
     }
   }, [])
 
+    // Cálculos basados en estado local
+  const totalRooms = rooms.length
+  const availableRooms = rooms.filter((r) => r.status === "ACTIVE").length
+  const inactiveRooms = totalRooms - availableRooms
+
   const totalRevenue = reservations
     .filter((r) => r.status === "APPROVED" || r.status === "CONFIRMED")
     .reduce((sum, r) => sum + Number(r.totalValue || 0), 0)
@@ -86,7 +131,6 @@ export default function AdminDashboard() {
     (r) => r.status === "APPROVED" || r.status === "CONFIRMED"
   ).length
 
-  const availableRooms = rooms.filter((r: any) => r.status === "ACTIVE").length
   const activeServices = services.filter((s) => s.status === "ACTIVE").length
 
   const stats = [
@@ -109,8 +153,9 @@ export default function AdminDashboard() {
       color: "text-blue-600",
     },
     {
-      label: "Habitaciones Disponibles",
-      value: `${availableRooms}/${rooms.length}`,
+      label: "Habitaciones Activas",
+      value: loadingRooms ? "..." : `${availableRooms}/${totalRooms}`,
+      subvalue: `${availableRooms} activas • ${inactiveRooms} inactivas`,
       icon: BedDouble,
       color: "text-purple-600",
     },
