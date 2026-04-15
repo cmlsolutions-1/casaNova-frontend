@@ -1,9 +1,9 @@
 //app/booking/check/page.tsx
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Search, ArrowLeft, FileText, CalendarDays, CreditCard, ShieldCheck } from "lucide-react"
+import { Search, ArrowLeft, FileText, CalendarDays, CreditCard, ShieldCheck, CheckCircle2, Users } from 'lucide-react';
 
 import { PublicHeader } from "@/components/public-header"
 import { PublicFooter } from "@/components/public-footer"
@@ -105,6 +105,25 @@ export default function BookingCheckPage() {
   console.log("reservation", reservation)
 console.log("rooms", reservation?.rooms)
 console.log("numberOfPeople room 0", reservation?.rooms?.[0]?.numberOfPeople)
+
+// Cálculos de desglose de huéspedes
+const guestBreakdown = useMemo(() => {
+  if (!reservation?.rooms) {
+    return { adults: 0, kids: 0, babies: 0, pets: 0 }
+  }
+
+  return reservation.rooms.reduce(
+    (acc, room) => ({
+      adults: acc.adults + Number(room.numberOfPeople || 0),
+      kids: acc.kids + Number(room.children || 0),
+      babies: acc.babies + Number(room.babys || 0),
+      pets: acc.pets + Number(room.pets || 0),
+    }),
+    { adults: 0, kids: 0, babies: 0, pets: 0 }
+  )
+}, [reservation?.rooms])
+
+const { adults, kids, babies, pets } = guestBreakdown
 
   return (
     <main>
@@ -217,13 +236,39 @@ console.log("numberOfPeople room 0", reservation?.rooms?.[0]?.numberOfPeople)
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <ShieldCheck className="h-4 w-4 text-accent" />
+                        {/* Huéspedes */}
+                      <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <Users className="h-4 w-4 text-accent mt-0.5" />
+                        <div className="flex flex-col gap-1">
                           <span>
-                            Cantidad de personas:{" "}
-                            <strong className="text-foreground">{totalGuests}</strong>
+                            <strong>Adultos:</strong>{" "}
+                            <span className="text-foreground">{adults}</span>
                           </span>
+                          
+                          {kids > 0 && (
+                            <span>
+                              <strong>Niños:</strong>{" "}
+                              <span className="text-foreground">{kids}</span>
+                            </span>
+                          )}
+                          
+                          {babies > 0 && (
+                            <span>
+                              <strong>Bebés:</strong>{" "}
+                              <span className="text-foreground">{babies}</span>
+                            </span>
+                          )}
+                          
+                          {pets > 0 && (
+                            <span>
+                              <strong>Mascotas:</strong>{" "}
+                              <span className="text-foreground">{pets}</span>
+                            </span>
+                          )}
                         </div>
+                      </div>
+
+
                       </div>
                     </div>
 
