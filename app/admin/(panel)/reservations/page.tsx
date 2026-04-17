@@ -329,6 +329,13 @@ export default function AdminReservationsPage() {
               </div>
 
               <div>
+                  <p className="text-muted-foreground">Teléfono</p>
+                  <p className="text-foreground">
+                    {selectedRes.client?.phone || "No disponible"}
+                  </p>
+                </div>
+
+              <div>
                 <p className="mb-1 text-muted-foreground">Habitaciones</p>
                 {selectedRes.rooms?.length ? (
                   <ul className="space-y-1">

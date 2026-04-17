@@ -110,12 +110,32 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
   const nextImg = () => setImgIdx((p) => (p + 1) % imageUrls.length)
 
   const handleSelect = () => {
-    if (!room) return
+  if (!room) return
 
-    // guarda searchParams en booking (para no perderlos)
-    if (start && end) {
-      setSearchParams({ startDate: start, endDate: end, adults, kids, babies, pets })
-    }
+  // Verificar que las fechas estén en la URL (no solo en contexto)
+  const hasUrlDates = searchParams.has("start") && searchParams.has("end")
+
+  if (!hasUrlDates) {
+    toast.info("Fechas requeridas", {
+      description: "Selecciona las fechas de llegada y salida para continuar con tu reserva.",
+      duration: 4000,
+    })
+    router.push("/search")
+    return
+  }
+
+  // Aquí sí puedes usar el fallback para los valores
+  if (!start || !end) {
+    toast.info("Fechas requeridas", {
+      description: "Selecciona las fechas de llegada y salida para continuar con tu reserva.",
+      duration: 4000,
+    })
+    router.push("/search")
+    return
+  }
+    
+  // Guarda searchParams en booking (para no perderlos)
+  setSearchParams({ startDate: start, endDate: end, adults, kids, babies, pets })
 
     // Calcula TODO como number (evita strings del storage)
     const requiredPeople = Number(adults) + Number(kids)
@@ -330,7 +350,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
                 {priceCalc.petsPrice > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-amber-600">
-                      {petsInRoom} mascota{petsInRoom > 1 ? "s" : ""} × $20.000
+                      {petsInRoom} mascota{petsInRoom > 1 ? "s" : ""} × $30.000
                     </span>
                     <span className="font-medium text-amber-600">${priceCalc.petsPrice.toLocaleString()}</span>
                   </div>

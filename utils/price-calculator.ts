@@ -17,7 +17,7 @@ export function calculateRoomPrice(
 } {
   const adultPrice = pricePerPerson
   const kidPrice = pricePerPerson * 0.5
-  const petPrice = 20000 // Precio por mascota por noche
+  const petPrice = 30000 // Precio por mascota por noche
 
   const adultsTotal = adultPrice * adults
   const kidsTotal = kidPrice * kids

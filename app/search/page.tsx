@@ -34,7 +34,7 @@ function SearchResults() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [editingSearch, setEditingSearch] = useState(false)
+  const [editingSearch, setEditingSearch] = useState(!start || !end)
   const [localSearch, setLocalSearch] = useState({
     start: start || "",
     end: end || "",
@@ -346,7 +346,7 @@ function SearchResults() {
                         )}
                         {petsInRoom > 0 && (
                           <p className="text-amber-600 font-medium">
-                            {petsInRoom} mascota{petsInRoom > 1 ? "s" : ""} × $20.000 = ${priceCalc.petsPrice.toLocaleString()}
+                            {petsInRoom} mascota{petsInRoom > 1 ? "s" : ""} × $30.000 = ${priceCalc.petsPrice.toLocaleString()}
                           </p>
                         )}
                         {priceCalc.kidsDiscount > 0 && (

@@ -1,7 +1,7 @@
 //app/admin/(panel)/rooms/page.tsx
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { useBooking } from "@/lib/booking-context"
 import { listAmenitiesService, type BackendAmenity } from "@/services/amenity.service"
 import {
@@ -629,6 +629,16 @@ export default function AdminRoomsPage() {
     }
   }
 
+  // Ordenamiento ascendente por nombre (con soporte numérico: "Hab 2" < "Hab 10")
+  const sortedRooms = useMemo(() => {
+    return [...rooms].sort((a, b) =>
+      a.nameRoom.localeCompare(b.nameRoom, undefined, {
+        numeric: true,      // Orden numérico: 2 < 10
+        sensitivity: 'base' // Ignora mayúsculas/minúsculas
+      })
+    )
+  }, [rooms])
+
   useEffect(() => {
     if (!adminAuth.isAuthenticated) return
     loadRooms()
@@ -692,7 +702,7 @@ export default function AdminRoomsPage() {
       {error && <p className="text-red-500">{error}</p>}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {rooms.map((room) => {
+        {sortedRooms.map((room) => {
           const img = room.images?.[0]?.url || roomImageByType(room.type)
           const isActive = room.status === "ACTIVE"
 

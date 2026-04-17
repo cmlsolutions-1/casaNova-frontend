@@ -10,16 +10,6 @@ import { Bed, Users, Eye } from "lucide-react";
 import { formatCurrencyCOP } from "@/utils/format"
 import { AutoImageCarousel } from "@/components/auto-image-carousel"
 
-const ROOM_TYPE_ORDER: RoomType[] = [
-  "SIMPLE",
-  "DOUBLE",
-  "TRIPLE",
-  "QUADRUPLE",
-  "QUINTUPLE",
-  "SEXTUPLE",
-  "VIP",
-]
-
 const ROOM_TYPE_LABEL: Record<RoomType, string> = {
   SIMPLE: "Simple",
   DOUBLE: "Doble",
@@ -41,59 +31,69 @@ export function RoomsPreview() {
       try {
         const data = await listRoomsPublicService()
         if (!alive) return
-        // opcional: solo activas
+        // Filtrar solo habitaciones activas
         setRooms((data ?? []).filter((r) => r.status === "ACTIVE"))
       } finally {
         if (alive) setLoading(false)
       }
     })()
+
     return () => {
       alive = false
     }
   }, [])
 
-  const featured = useMemo(() => {
-    const roomByType = new Map<RoomType, BackendRoom>()
-
-    for (const room of rooms) {
-      if (!roomByType.has(room.type)) {
-        roomByType.set(room.type, room)
-      }
-    }
-
-    return ROOM_TYPE_ORDER.map((type) => roomByType.get(type)).filter(Boolean) as BackendRoom[]
+  // Ordenar todas las habitaciones de forma ascendente (numérica y alfabética)
+  const sortedRooms = useMemo(() => {
+    return [...rooms].sort((a, b) =>
+      a.nameRoom.localeCompare(b.nameRoom, undefined, {
+        numeric: true,      // "Hab 2" antes que "Hab 10"
+        sensitivity: "base", //  Ignora mayúsculas/minúsculas
+      })
+    )
   }, [rooms])
 
   return (
     <section id="rooms" className="bg-secondary/50 py-20 px-4">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-12 text-center">
-          <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-accent">
-            Alojamiento de lujo
-          </p>
-          <h2 className="font-serif text-3xl font-bold text-foreground md:text-5xl text-balance">
-            Nuestras Habitaciones
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
-            Cada habitación ha sido diseñada con atención al detalle para
-            ofrecer el máximo confort y elegancia.
-          </p>
-        </div>
+        <div className="mb-16 text-center space-y-6">
+        {/* Badge superior más destacado */}
+        <div className="inline-flex items-center justify-center">
+        <span className="rounded-full bg-accent px-5 py-2 text-xs font-bold uppercase tracking-[0.25em] text-accent-foreground border-2 border-accent-foreground/20">
+          Alojamiento de Lujo
+        </span>
+      </div>
+
+        {/* Título más grande, negrita extrema y balanceado */}
+        <h2 className="font-serif text-4xl font-extrabold tracking-tight text-foreground md:text-6xl lg:text-7xl text-balance">
+          Nuestras Habitaciones
+        </h2>
+
+        {/* Descripción corregida: sin </span> sobrante */}
+        <p className="mx-auto max-w-3xl text-lg md:text-xl font-medium leading-relaxed text-foreground/90">
+          Cada habitación ha sido diseñada con{" "}
+          <span className="font-bold text-accent">atención al detalle</span> para ofrecer el{" "}
+          <span className="font-bold text-foreground">máximo confort</span> y elegancia en el corazón del Eje Cafetero.
+        </p>
+      </div>
 
         {loading && (
           <p className="text-center text-muted-foreground">Cargando habitaciones...</p>
         )}
 
-        {!loading && featured.length === 0 && (
+        {!loading && sortedRooms.length === 0 && (
           <p className="text-center text-muted-foreground">
             No hay habitaciones disponibles en este momento.
           </p>
         )}
 
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-          {featured.map((room) => {
+          {sortedRooms.map((room) => {
             return (
-              <div key={room.id} className="group overflow-hidden rounded-2xl bg-card shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+              <div 
+                key={room.id} 
+                className="group flex flex-col h-full overflow-hidden rounded-2xl bg-card shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+                >
                 <div className="relative h-56 overflow-hidden">
                   <div className="h-full w-full transition-transform duration-500 group-hover:scale-110">
                     <AutoImageCarousel
@@ -107,7 +107,7 @@ export function RoomsPreview() {
                   </div>
                 </div>
 
-                <div className="p-5">
+                <div className="flex flex-col flex-1 p-5">
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <Badge variant="secondary" className="text-xs">
                       {ROOM_TYPE_LABEL[room.type]}
@@ -141,12 +141,13 @@ export function RoomsPreview() {
                     </span>
                   </div>
 
-                 {/*  <Link href={`/rooms/${room.id}`} className="mt-4 block">
-                    <Button variant="outline" className="w-full rounded-xl border-accent text-accent hover:bg-accent hover:text-accent-foreground bg-transparent">
+                 <Link href={`/rooms/${room.id}`} className="mt-auto pt-4 block">
+                    {/* Botón sólido amarillo, sin transparencia, texto contrastante */}
+                    <Button className="w-full rounded-xl bg-accent text-accent-foreground hover:bg-accent/90">
                       <Eye className="mr-2 h-4 w-4" />
                       Ver Detalles
                     </Button>
-                  </Link> */}
+                  </Link>
                 </div>
               </div>
             )
