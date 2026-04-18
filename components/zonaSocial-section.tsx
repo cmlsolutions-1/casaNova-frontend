@@ -139,18 +139,23 @@ export function ZonaSocialSection() {
   return (
     <section id="zonas-sociales" className="px-4 py-20">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-12 text-center">
-          <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-accent">
-            Experiencias exclusivas
-          </p>
-          <h2 className="text-balance font-serif text-3xl font-bold text-foreground md:text-5xl">
+        <div className="mb-16 text-center space-y-6">
+        {/* Badge superior más destacado */}
+        <div className="inline-flex items-center justify-center">
+        <span className="rounded-full bg-accent px-5 py-2 text-xs font-bold uppercase tracking-[0.25em] text-accent-foreground border-2 border-accent-foreground/20 shadow-xl transition-shadow hover:shadow-lg">
+            Vivencias inigualables
+          </span>
+          </div>
+
+          <h2 className="font-serif text-4xl font-extrabold tracking-tight text-foreground md:text-6xl lg:text-7xl text-balance">
             Zonas Sociales
           </h2>
-          <p className="mx-auto mt-4 max-w-3xl text-base leading-relaxed text-muted-foreground">
-            Conoce nuestras zonas sociales diseñadas para brindarte momentos inolvidables.
-            Cada espacio está pensado para ofrecerte comodidad, estilo y una atmósfera ideal
-            para compartir, relajarte o disfrutar de un momento especial.
-          </p>
+          {/* Descripción corregida: sin </span> sobrante */}
+        <p className="mx-auto max-w-3xl text-lg md:text-xl font-medium leading-relaxed text-foreground/90">
+          Conoce nuestras zonas sociales diseñadas para brindarte {" "}
+          <span className="font-bold text-accent">momentos inolvidables.</span> Cada espacio está pensado para ofrecerte comodidad, estilo y una atmósfera ideal{" "}
+          <span className="font-bold text-foreground">para compartir,</span> relajarte o disfrutar de un momento especial.
+        </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.5fr_0.7fr]">

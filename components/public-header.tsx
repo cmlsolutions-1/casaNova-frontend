@@ -13,8 +13,11 @@ export function PublicHeader() {
 
   const links = [
     { href: "/#rooms", label: "Habitaciones" },
-    { href: "/#services", label: "Servicios" },
-    { href: "/booking/check", label: "Consultar Reserva" },
+    { href: "/#services", label: "Servicios Adicionales" },
+    { href: "/#otros-servicios", label: "Extras" },
+    { href: "/#zonas-sociales", label: "Instalaciones" },
+    { href: "/#ubicacion", label: "Ubicación" },
+    { href: "/booking/check", label: "Mi Reserva" },
     { href: "/admin/login", label: "Admin" },
   ]
 
@@ -42,7 +45,7 @@ export function PublicHeader() {
             <Link
               key={l.href}
               href={l.href}
-              className="text-sm font-medium tracking-wide text-white/80 transition-colors hover:text-accent"
+              className="text-sm font-medium text-white/80 transition-colors hover:text-accent whitespace-nowrap"
             >
               {l.label}
             </Link>

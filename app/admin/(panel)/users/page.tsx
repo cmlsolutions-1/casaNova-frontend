@@ -94,13 +94,14 @@ export default function AdminUsersPage() {
             </DialogHeader>
 
             <CreateUserForm
-              onSave={async (body) => {
-                await createUserService(body)
-                await loadUsers()
-                setCreating(false)
-              }}
-              onClose={() => setCreating(false)}
-            />
+                key={String(creating)}
+                onSave={async (body) => {
+                  await createUserService(body)
+                  await loadUsers()
+                  setCreating(false)
+                }}
+                onClose={() => setCreating(false)}
+              />
           </DialogContent>
         </Dialog>
 
@@ -113,6 +114,7 @@ export default function AdminUsersPage() {
 
             {editingUser && (
               <EditUserForm
+                key={editingUser.id}
                 user={editingUser}
                 onSave={async (body) => {
                   await updateUserService(editingUser.id, body)

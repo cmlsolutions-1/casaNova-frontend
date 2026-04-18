@@ -1,8 +1,7 @@
-//app/booking/guest/page.tsx
-
+// app/booking/guest/page.tsx
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useBooking } from "@/lib/booking-context"
 import { Button } from "@/components/ui/button"
@@ -11,6 +10,18 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowRight, ArrowLeft, User } from "lucide-react"
 import type { GuestInfo } from "@/lib/mock-data"
+
+// Función para calcular edad exacta
+function calculateAge(birthDate: string): number {
+  const birth = new Date(birthDate)
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const m = today.getMonth() - birth.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--
+  }
+  return age
+}
 
 export default function BookingGuestPage() {
   const router = useRouter()
@@ -30,17 +41,21 @@ export default function BookingGuestPage() {
   const hasRooms = booking.selectedRooms && booking.selectedRooms.length > 0
   const hasExtraBooking = !!booking.extraBooking
 
+  // Fecha máxima permitida: 18 años atrás desde hoy
+  const maxDate = useMemo(() => {
+    const date = new Date()
+    date.setFullYear(date.getFullYear() - 18)
+    return date.toISOString().split("T")[0]
+  }, [])
+
   useEffect(() => {
-    // no validar hasta que el context esté hidratado
     if (!hydrated) return
 
-    // ahora la validación es por selectedRooms
     if (!hasRooms && !hasExtraBooking) {
       router.push("/")
       return
     }
 
-    // si ya había guestInfo, precargar
     if (booking.guestInfo) {
       setForm(booking.guestInfo)
     }
@@ -59,7 +74,16 @@ export default function BookingGuestPage() {
 
     if (!form.documentNumber.trim()) errs.documentNumber = "Documento requerido"
     if (!form.address.trim()) errs.address = "Dirección requerida"
-    if (!form.birthDay) errs.birthDay = "Fecha de nacimiento requerida"
+
+    // Validación de fecha de nacimiento y mayoría de edad
+    if (!form.birthDay) {
+      errs.birthDay = "Fecha de nacimiento requerida"
+    } else {
+      const age = calculateAge(form.birthDay)
+      if (age < 18) {
+        errs.birthDay = "Debes ser mayor de edad (18 años) para realizar una reserva."
+      }
+    }
 
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -68,8 +92,6 @@ export default function BookingGuestPage() {
   const handleContinue = () => {
     if (!validate()) return
     setGuestInfo(form)
-
-    // para evitar carreras de estado, navega en el siguiente tick
     setTimeout(() => router.push("/booking/confirm"), 0)
   }
 
@@ -78,7 +100,6 @@ export default function BookingGuestPage() {
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }))
   }
 
-  // opcional: evita render raro antes de hidratar
   if (!hydrated) return null
 
   return (
@@ -182,25 +203,29 @@ export default function BookingGuestPage() {
               type="date"
               value={form.birthDay}
               onChange={(e) => updateField("birthDay", e.target.value)}
+              max={maxDate} // Restringe selección a mayores de 18 años
               className="mt-1.5 rounded-xl"
             />
             {errors.birthDay && <p className="mt-1 text-xs text-destructive">{errors.birthDay}</p>}
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Debes ser mayor de 18 años para realizar una reserva.
+            </p>
           </div>
         </div>
       </div>
 
       <div className="mt-8 flex justify-between">
         <Button
-            variant="outline"
-            onClick={() => {
-              if (booking.extraBooking) {
-                router.push(`/booking/extra-service/${booking.extraBooking.kind}`)
-                return
-              }
-              router.push("/booking/services")
-            }}
-            className="rounded-xl px-6"
-          >
+          variant="outline"
+          onClick={() => {
+            if (booking.extraBooking) {
+              router.push(`/booking/extra-service/${booking.extraBooking.kind}`)
+              return
+            }
+            router.push("/booking/services")
+          }}
+          className="rounded-xl px-6"
+        >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Atrás
         </Button>

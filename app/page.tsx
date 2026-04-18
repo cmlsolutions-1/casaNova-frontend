@@ -17,13 +17,32 @@ export default function Page() {
   return (
     <main>
       <PublicHeader />
+      
       <HeroCarousel images={images} />
-      <SearchBar />
-      <RoomsPreview />
-      <ServicesSection />
-      <ServicesOtherDay />
-      <ZonaSocialSection />
-      <LocationSection />
+      
+      <section id="search">
+        <SearchBar />
+      </section>
+
+      <section id="rooms">
+        <RoomsPreview />
+      </section>
+
+      <section id="services">
+        <ServicesSection />
+      </section>
+
+      <section id="otros-servicios">
+        <ServicesOtherDay />
+      </section>
+
+      <section id="zonas-sociales">
+        <ZonaSocialSection />
+      </section>
+      <section id="ubicacion">
+        <LocationSection />
+      </section>
+
       <PublicFooter />
     </main>
   )

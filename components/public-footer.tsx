@@ -33,13 +33,22 @@ export function PublicFooter() {
                 Habitaciones
               </Link>
               <Link href="/#services" className="text-sm text-primary-foreground/70 hover:text-accent transition-colors">
-                Servicios
+                Servicios Adicionales
+              </Link>
+              <Link href="/#otros-servicios" className="text-sm text-primary-foreground/70 hover:text-accent transition-colors">
+                Otros Servicios
+              </Link>
+              <Link href="/#zonas-sociales" className="text-sm text-primary-foreground/70 hover:text-accent transition-colors">
+                Zonas Sociales
+              </Link>
+              <Link href="/#ubicacion" className="text-sm text-primary-foreground/70 hover:text-accent transition-colors">
+                Ubicación
               </Link>
               <Link href="/#search" className="text-sm text-primary-foreground/70 hover:text-accent transition-colors">
                 Reservar
               </Link>
               <Link href="/booking/check" className="text-sm text-primary-foreground/70 hover:text-accent transition-colors">
-                Consultar Reserva
+                Mi Reserva
               </Link>
               <Link href="/admin/login" className="text-sm text-primary-foreground/70 hover:text-accent transition-colors">
                 Administración

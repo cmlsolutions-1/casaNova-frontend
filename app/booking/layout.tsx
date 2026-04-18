@@ -1,3 +1,4 @@
+//app/booking/layout.tsx
 "use client"
 
 import React from "react"
@@ -19,12 +20,16 @@ export default function BookingLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname()
   const currentIdx = steps.findIndex((s) => pathname.startsWith(s.path))
 
+   // Ocultar pasos en /booking/check
+  const showSteps = pathname !== "/booking/check"
+
   return (
     <main>
       <PublicHeader />
       <div className="pt-24 pb-12 px-4">
         <div className="mx-auto max-w-4xl">
           {/* Step indicator */}
+          {showSteps && (
           <nav className="mb-10 flex items-center justify-center gap-1 overflow-x-auto" aria-label="Pasos de reserva">
             {steps.map((step, i) => {
               const isActive = i === currentIdx
@@ -63,6 +68,7 @@ export default function BookingLayout({ children }: { children: React.ReactNode 
               )
             })}
           </nav>
+          )}
           {children}
         </div>
       </div>
