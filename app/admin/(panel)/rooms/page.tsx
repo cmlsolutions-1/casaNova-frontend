@@ -155,6 +155,14 @@ function RoomForm({
   // sincronizamos el form con lo nuevo.
   useEffect(() => {
     if (!room) return
+
+    // Ordenar imágenes: la que tiene isCover va primero
+    const sortedImages = [...(room.images ?? [])].sort((a, b) => {
+      if (a.isCover && !b.isCover) return -1
+      if (!a.isCover && b.isCover) return 1
+      return 0
+    })
+  
     setForm({
       type: room.type,
       nameRoom: room.nameRoom,
@@ -170,7 +178,7 @@ function RoomForm({
       amenityIds: room.amenities?.map((a) => a.id) ?? [],
       imagesIds: [],
     })
-    setExistingImages(room.images ?? [])
+    setExistingImages(sortedImages) //Usar imágenes ordenadas
     setImages([])
     setUploadedImageIds([])
   }, [room])
@@ -269,14 +277,15 @@ const uploadSelectedImages = async () => {
         : existingImageIds
       : uploadedImageIds
 
+       // Derivar coverImageId: siempre es el primero
+    const coverImageId = imagesIdsToSend[0]
+
     const body: RoomUpsertBody = {
       ...form,
       imagesIds: imagesIdsToSend,
+      coverImageId,
     }
 
-    console.log("existingImageIds:", existingImageIds)
-    console.log("uploadedImageIds:", uploadedImageIds)
-    console.log("imagesIdsToSend:", imagesIdsToSend)
     console.log("BODY QUE SE ENVÍA:", body)
 
     await onSave(body)
@@ -703,7 +712,10 @@ export default function AdminRoomsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {sortedRooms.map((room) => {
-          const img = room.images?.[0]?.url || roomImageByType(room.type)
+          const img =
+          room.images?.find((img) => img.isCover)?.url ||
+          room.images?.[0]?.url ||
+          roomImageByType(room.type)
           const isActive = room.status === "ACTIVE"
 
           return (

@@ -6,7 +6,11 @@ export type ServiceStatus = "ACTIVE" | "INACTIVE"
 export type ServiceBillingType = "FIXED" | "HOURLY"
 export type ServiceType = "STAY" | "DAY_PASS"
 
-export type BackendImage = { id: string; url: string }
+export type BackendImage = { 
+  id: string; 
+  url: string;
+  isCover?: boolean;
+}
 
 export type BackendService = {
   id: string
@@ -37,6 +41,7 @@ export type ServiceUpsertBody = {
   billingType: ServiceBillingType
   type: ServiceType
   imagesIds?: string[]
+  coverImageId?: string
 }
 
 export async function listServicesService() {

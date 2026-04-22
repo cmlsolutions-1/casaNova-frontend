@@ -140,7 +140,12 @@ export function RoomsPreview() {
 
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
           {sortedRooms.map((room) => {
-            const firstImage = room.images?.[0]?.url || "/placeholder.svg"
+            // Buscar explícitamente la imagen de portada
+          const coverImage =
+            room.images?.find((img) => img.isCover)?.url ||
+            room.images?.[0]?.url ||
+            "/placeholder.svg"
+
 
             return (
               <div
@@ -153,7 +158,7 @@ export function RoomsPreview() {
                   onClick={() => openGallery(room)}
                 >
                   <img
-                    src={firstImage}
+                    src={coverImage}
                     alt={`Habitación ${room.nameRoom}`}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                   />

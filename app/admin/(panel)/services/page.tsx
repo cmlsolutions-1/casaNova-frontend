@@ -118,11 +118,18 @@ function ServiceForm({
     setUploadedImageIds([])
 
     setError(null)
-    setUploading(false)
-    setSaving(false)
-    setExistingImages(service?.images ?? [])
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [service?.id])
+  setUploading(false)
+  setSaving(false)
+
+  // Ordenar imágenes: la que tiene isCover va primero
+  const sortedImages = [...(service?.images ?? [])].sort((a, b) => {
+    if (a.isCover && !b.isCover) return -1
+    if (!a.isCover && b.isCover) return 1
+    return 0
+  })
+
+  setExistingImages(sortedImages) // Usar imágenes ordenadas
+}, [service?.id])
 
   const formatCOPNumber = (value: number | string) => {
     const numeric =
@@ -239,6 +246,9 @@ function ServiceForm({
         : existingImageIds
       : uploadedImageIds
 
+          // Derivar coverImageId: siempre es el primero
+    const coverImageId = imagesIdsToSend[0]
+
     const body: ServiceUpsertBody = {
       name,
       description,
@@ -246,14 +256,10 @@ function ServiceForm({
       billingType,
       type,
       imagesIds: imagesIdsToSend,
+      coverImageId,
     }
 
-    console.log("existingImageIds:", existingImageIds)
-    console.log("uploadedImageIds al hacer submit:", uploadedImageIds)
-    console.log("imagesIdsToSend:", imagesIdsToSend)
     console.log("BODY QUE SE ENVÍA:", body)
-
-    console.log("imagesIdsToSend (ORDEN):", imagesIdsToSend)
 
     await onSave(body)
     onClose()

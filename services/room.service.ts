@@ -12,7 +12,11 @@ export type RoomType =
   | "VIP"
 
 export type RoomStatus = "ACTIVE" | "INACTIVE"
-export type BackendImage = { id: string; url: string }
+export type BackendImage = { 
+  id: string; 
+  url: string;
+  isCover?: boolean;
+}
 
 export type BackendRoom = {
   id: string
@@ -48,6 +52,7 @@ export type RoomUpsertBody = {
   isBusy: boolean
   amenityIds: string[]
   imagesIds: string[]
+  coverImageId?: string
 }
 
 export async function listRoomsService() {

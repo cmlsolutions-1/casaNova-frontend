@@ -310,7 +310,7 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
 
 
   const setSearchParams = useCallback((params: SearchParams) => {
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
 
     setBooking((prev) => ({
       ...prev, // Preserva guestInfo y otros datos
@@ -350,7 +350,7 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
   // ===== NUEVAS FUNCIONES DE SESIÓN =====
 
   const startBookingSession = useCallback(() => {
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
 
     setBooking((prev) => ({
       ...prev,
@@ -455,7 +455,7 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
     const setExtraBooking = useCallback((data: ExtraBookingSelection) => {
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString() // 15 minutos
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15 minutos
     setBooking((prev) => ({
       ...prev,
       searchParams: null,
