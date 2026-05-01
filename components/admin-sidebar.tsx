@@ -27,6 +27,7 @@ import Image from "next/image"
 const adminLinks = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/rooms", label: "Habitaciones", icon: BedDouble },
+  { href: "/admin/gestion-hotelera", label: "Gestión Hotelera", icon: ListChecks },
   { href: "/admin/services", label: "Servicios", icon: Sparkles },
   { href: "/admin/amenities", label: "Amenidades", icon: ListChecks },
   { href: "/admin/reservations", label: "Reservas", icon: CalendarCheck },

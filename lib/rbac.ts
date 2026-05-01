@@ -12,7 +12,7 @@ export const PERMISSIONS: {
   actions: Record<Role, string[]>
 } = {
   routes: {
-    SUPER_ADMIN: ["/admin", "/admin/rooms", "/admin/services", "/admin/amenities", "/admin/reservations", "/admin/users"],
+    SUPER_ADMIN: ["/admin", "/admin/rooms", "/admin/services", "/admin/amenities", "/admin/reservations", "/admin/users", "/admin/gestion-hotelera"],
     ADMIN: ["/admin", "/admin/rooms", "/admin/services", "/admin/amenities","/admin/reservations"],
     EMPLOYEE: ["/admin", "/admin/rooms", "/admin/reservations"],
   },
