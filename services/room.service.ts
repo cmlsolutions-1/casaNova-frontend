@@ -55,6 +55,46 @@ export type RoomUpsertBody = {
   coverImageId?: string
 }
 
+export type RoomDailyPrice = {
+  date: string
+  price: number
+  isOverride: boolean
+}
+
+export type UpdateRoomDailyPricesBody = {
+  prices: {
+    date: string
+    price: number | null
+  }[]
+}
+
+export async function getRoomDailyPricesService(params: {
+  roomId: string
+  start: string
+  end: string
+}) {
+  const q = new URLSearchParams({
+    start: params.start,
+    end: params.end,
+  })
+
+  return apiFetch<RoomDailyPrice[]>(
+    `/api/room/${params.roomId}/daily-prices?${q.toString()}`,
+    { auth: true }
+  )
+}
+
+export async function updateRoomDailyPricesService(
+  roomId: string,
+  body: UpdateRoomDailyPricesBody
+) {
+  return apiFetch<RoomDailyPrice[]>(`/api/room/${roomId}/daily-prices`, {
+    method: "PUT",
+    auth: true,
+    body: JSON.stringify(body),
+  })
+}
+
 export async function listRoomsService() {
   return apiFetch<BackendRoom[]>("/api/room", { auth: true })
 }
