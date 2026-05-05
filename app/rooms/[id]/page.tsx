@@ -25,34 +25,100 @@ import {
   Check,
 } from "lucide-react"
 
-import { getRoomPublicService, type BackendRoom } from "@/services/room.service"
+import {
+  getRoomPublicService,
+  getRoomDailyPricesPublicService,
+  type BackendRoom,
+  type RoomDailyPrice,
+} from "@/services/room.service"
+
 import { calculateRoomPrice, formatCOP } from "@/utils/price-calculator"
+
+function getNightsBetween(start: string, end: string) {
+  const startDate = new Date(`${start}T12:00:00`)
+  const endDate = new Date(`${end}T12:00:00`)
+
+  const dates: string[] = []
+  const current = new Date(startDate)
+
+  while (current < endDate) {
+    const year = current.getFullYear()
+    const month = String(current.getMonth() + 1).padStart(2, "0")
+    const day = String(current.getDate()).padStart(2, "0")
+
+    dates.push(`${year}-${month}-${day}`)
+    current.setDate(current.getDate() + 1)
+  }
+
+  return dates
+}
 
 function RoomDetailContent({ roomId }: { roomId: string }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { addSelectedRoom, replaceSelectedRooms, booking, setSearchParams } = useBooking()
+  const {
+    addSelectedRoom,
+    replaceSelectedRooms,
+    booking,
+    setSearchParams,
+  } = useBooking()
 
   const [room, setRoom] = useState<BackendRoom | null>(null)
+  const [dailyPrices, setDailyPrices] = useState<RoomDailyPrice[]>([])
   const [loadingRoom, setLoadingRoom] = useState(true)
   const [imgIdx, setImgIdx] = useState(0)
 
   const returnTo = searchParams.get("returnTo") || ""
 
-  // Cargar habitación desde backend (PUBLICO)
+  const remaining = Number(searchParams.get("remaining")) || 0
+
+  const start =
+    searchParams.get("start") || booking.searchParams?.startDate || ""
+
+  const end =
+    searchParams.get("end") || booking.searchParams?.endDate || ""
+
+  const adults =
+    Number(searchParams.get("adults")) || booking.searchParams?.adults || 2
+
+  const kids =
+    Number(searchParams.get("kids")) || booking.searchParams?.kids || 0
+
+  const babies =
+    Number(searchParams.get("babies")) || booking.searchParams?.babies || 0
+
+  const pets =
+    Number(searchParams.get("pets")) || booking.searchParams?.pets || 0
+
   useEffect(() => {
     let alive = true
     setLoadingRoom(true)
 
     ;(async () => {
       try {
-        const data = await getRoomPublicService(roomId)
+        const roomData = await getRoomPublicService(roomId)
+
         if (!alive) return
-        setRoom(data)
+
+        setRoom(roomData)
         setImgIdx(0)
+
+        if (start && end) {
+          const prices = await getRoomDailyPricesPublicService({
+            roomId,
+            start,
+            end,
+          })
+
+          if (!alive) return
+          setDailyPrices(prices)
+        } else {
+          setDailyPrices([])
+        }
       } catch {
         if (!alive) return
         setRoom(null)
+        setDailyPrices([])
       } finally {
         if (alive) setLoadingRoom(false)
       }
@@ -61,17 +127,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
     return () => {
       alive = false
     }
-  }, [roomId])
-
-  const remaining = Number(searchParams.get("remaining")) || 0
-
-  // Params de búsqueda (se conservan)
-  const start = searchParams.get("start") || booking.searchParams?.startDate || ""
-  const end = searchParams.get("end") || booking.searchParams?.endDate || ""
-  const adults = Number(searchParams.get("adults")) || booking.searchParams?.adults || 2
-  const kids = Number(searchParams.get("kids")) || booking.searchParams?.kids || 0
-  const babies = Number(searchParams.get("babies")) || booking.searchParams?.babies || 0
-  const pets = Number(searchParams.get("pets")) || booking.searchParams?.pets || 0
+  }, [roomId, start, end])
 
   const totalRequestedPeople = Number(adults) + Number(kids)
 
@@ -80,66 +136,175 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
   }, 0)
 
   const remainingBeforeSelection =
-    remaining > 0 ? remaining : Math.max(0, totalRequestedPeople - prevCapacity)
+    remaining > 0
+      ? remaining
+      : Math.max(0, totalRequestedPeople - prevCapacity)
 
   const selectedPeopleForThisRoom = room
-    ? Math.min(Number(room.capacity ?? 0), remainingBeforeSelection || totalRequestedPeople)
+    ? Math.min(
+        Number(room.capacity ?? 0),
+        remainingBeforeSelection || totalRequestedPeople
+      )
     : 0
 
-  // Distribuir adultos y niños en esta habitación
   const adultsInRoom = Math.min(adults, selectedPeopleForThisRoom)
   const remainingCapacity = selectedPeopleForThisRoom - adultsInRoom
   const kidsInRoom = Math.min(kids, remainingCapacity)
-
   const petsInRoom = Math.min(pets, room?.capacity ?? 0)
 
-  // Calcular precio con descuento para niños
-  const priceCalc = room
-    ? calculateRoomPrice(Number(room.price ?? 0), adultsInRoom, kidsInRoom, petsInRoom)
-    : { total: 0, adultsPrice: 0, kidsPrice: 0, petsPrice: 0, kidsDiscount: 0 }
+  const nights = useMemo(() => {
+    if (!start || !end) return []
+    return getNightsBetween(start, end)
+  }, [start, end])
 
-  const roomPricePerNight = priceCalc.total
+  const priceData = useMemo(() => {
+    if (!room) {
+      return {
+        priceCalc: {
+          total: 0,
+          adultsPrice: 0,
+          kidsPrice: 0,
+          petsPrice: 0,
+          kidsDiscount: 0,
+        },
+        roomPricePerNight: 0,
+        totalStayPrice: 0,
+        firstNightPrice: 0,
+        firstNightKidsPrice: 0,
+        hasCustomPrice: false,
+        nightlyBreakdown: [],
+      }
+    }
 
-  // Normaliza urls (backend devuelve [{id,url}])
+    const totalNights = Math.max(nights.length, 1)
+
+    const pricesMap = new Map(
+      dailyPrices.map((item) => [item.date, item])
+    )
+
+    const nightsToCalculate = nights.length > 0 ? nights : [""]
+
+    const nightlyBreakdown = nightsToCalculate.map((date) => {
+      const daily = pricesMap.get(date)
+
+      const realBasePrice = Number(daily?.price ?? room.price ?? 0)
+
+      const priceCalc = calculateRoomPrice(
+        realBasePrice,
+        adultsInRoom,
+        kidsInRoom,
+        petsInRoom
+      )
+
+      return {
+        date,
+        basePrice: realBasePrice,
+        isOverride: daily?.isOverride === true,
+        priceCalc,
+        total: priceCalc.total,
+      }
+    })
+
+    const totalStayPrice = nightlyBreakdown.reduce(
+      (sum, item) => sum + item.total,
+      0
+    )
+
+    const roomPricePerNight = Math.round(totalStayPrice / totalNights)
+
+    const totalAdultsPrice = nightlyBreakdown.reduce(
+      (sum, item) => sum + item.priceCalc.adultsPrice,
+      0
+    )
+
+    const totalKidsPrice = nightlyBreakdown.reduce(
+      (sum, item) => sum + item.priceCalc.kidsPrice,
+      0
+    )
+
+    const totalPetsPrice = nightlyBreakdown.reduce(
+      (sum, item) => sum + item.priceCalc.petsPrice,
+      0
+    )
+
+    const totalKidsDiscount = nightlyBreakdown.reduce(
+      (sum, item) => sum + item.priceCalc.kidsDiscount,
+      0
+    )
+
+    const firstNightPrice = nightlyBreakdown[0]?.basePrice ?? Number(room.price ?? 0)
+    const firstNightKidsPrice = firstNightPrice * 0.7
+
+    return {
+      priceCalc: {
+        total: totalStayPrice,
+        adultsPrice: totalAdultsPrice,
+        kidsPrice: totalKidsPrice,
+        petsPrice: totalPetsPrice,
+        kidsDiscount: totalKidsDiscount,
+      },
+      roomPricePerNight,
+      totalStayPrice,
+      firstNightPrice,
+      firstNightKidsPrice,
+      hasCustomPrice: nightlyBreakdown.some((item) => item.isOverride),
+      nightlyBreakdown,
+    }
+  }, [
+    room,
+    nights,
+    dailyPrices,
+    adultsInRoom,
+    kidsInRoom,
+    petsInRoom,
+  ])
+
+  const {
+    priceCalc,
+    roomPricePerNight,
+    totalStayPrice,
+    firstNightPrice,
+    firstNightKidsPrice,
+    hasCustomPrice,
+    nightlyBreakdown,
+  } = priceData
+
   const imageUrls = useMemo(() => {
     const urls = (room?.images ?? []).map((x: any) => x?.url).filter(Boolean)
     return urls.length ? urls : ["/LOGO.PNG"]
   }, [room])
 
-  const prevImg = () => setImgIdx((p) => (p === 0 ? imageUrls.length - 1 : p - 1))
-  const nextImg = () => setImgIdx((p) => (p + 1) % imageUrls.length)
+  const prevImg = () =>
+    setImgIdx((p) => (p === 0 ? imageUrls.length - 1 : p - 1))
+
+  const nextImg = () =>
+    setImgIdx((p) => (p + 1) % imageUrls.length)
 
   const handleSelect = () => {
-  if (!room) return
+    if (!room) return
 
-  // Verificar que las fechas estén en la URL (no solo en contexto)
-  const hasUrlDates = searchParams.has("start") && searchParams.has("end")
+    const hasUrlDates = searchParams.has("start") && searchParams.has("end")
 
-  if (!hasUrlDates) {
-    toast.info("Fechas requeridas", {
-      description: "Selecciona las fechas de llegada y salida para continuar con tu reserva.",
-      duration: 4000,
+    if (!hasUrlDates || !start || !end) {
+      toast.info("Fechas requeridas", {
+        description:
+          "Selecciona las fechas de llegada y salida para continuar con tu reserva.",
+        duration: 4000,
+      })
+      router.push("/search")
+      return
+    }
+
+    setSearchParams({
+      startDate: start,
+      endDate: end,
+      adults,
+      kids,
+      babies,
+      pets,
     })
-    router.push("/search")
-    return
-  }
 
-  // Aquí sí puedes usar el fallback para los valores
-  if (!start || !end) {
-    toast.info("Fechas requeridas", {
-      description: "Selecciona las fechas de llegada y salida para continuar con tu reserva.",
-      duration: 4000,
-    })
-    router.push("/search")
-    return
-  }
-    
-  // Guarda searchParams en booking (para no perderlos)
-  setSearchParams({ startDate: start, endDate: end, adults, kids, babies, pets })
-
-    // Calcula TODO como number (evita strings del storage)
     const requiredPeople = Number(adults) + Number(kids)
-
     const isReplacing = returnTo === "confirm"
 
     const prevCapacity = isReplacing
@@ -150,34 +315,31 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
 
     const thisCapacity = Number(room?.capacity ?? 0)
     const nextCapacity = prevCapacity + thisCapacity
-
     const remaining = Math.max(0, requiredPeople - nextCapacity)
 
-    
-
-    // 1) agrega la habitación
     const roomWithPricing = {
       ...room,
       selectedPeople: selectedPeopleForThisRoom,
       selectedPricePerNight: roomPricePerNight,
+      selectedTotalPrice: totalStayPrice,
       selectedAdults: adultsInRoom,
       selectedKids: kidsInRoom,
       selectedPets: petsInRoom,
       priceBreakdown: priceCalc,
+      nightlyBreakdown,
+      hasCustomPrice,
     }
 
     if (returnTo === "confirm") {
       replaceSelectedRooms([roomWithPricing])
 
       toast.success("Habitación actualizada", {
-        description: "Tu selección de habitación fue reemplazada correctamente.",
+        description:
+          "Tu selección de habitación fue reemplazada correctamente.",
         duration: 3000,
       })
 
-      setTimeout(() => {
-        router.push("/booking/confirm")
-      }, 0)
-
+      router.push("/booking/confirm")
       return
     }
 
@@ -185,28 +347,26 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
 
     if (remaining > 0) {
       toast.info("Aún faltan personas por acomodar", {
-        description: `Seleccionaste una habitación para ${thisCapacity} persona${thisCapacity === 1 ? "" : "s"}. Te faltan ${remaining} por acomodar. Elige otra habitación para completar tu reserva.`,
+        description: `Seleccionaste una habitación para ${thisCapacity} persona${
+          thisCapacity === 1 ? "" : "s"
+        }. Te faltan ${remaining} por acomodar. Elige otra habitación para completar tu reserva.`,
         duration: 6000,
       })
 
       router.push(
-        `/search?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}&remaining=${remaining}&returnTo=${returnTo}`,
+        `/search?start=${start}&end=${end}&adults=${adults}&kids=${kids}&babies=${babies}&pets=${pets}&remaining=${remaining}&returnTo=${returnTo}`
       )
       return
     }
 
     toast.success("¡Perfecto!", {
-      description: "Ya acomodaste a todos los huéspedes. Ahora puedes agregar servicios adicionales.",
+      description:
+        "Ya acomodaste a todos los huéspedes. Ahora puedes agregar servicios adicionales.",
       duration: 4000,
     })
 
-    setTimeout(() => {
-      router.push("/booking/services")
-    }, 0)
+    router.push("/booking/services")
   }
-
-
-
 
   if (loadingRoom) {
     return (
@@ -221,7 +381,9 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
       <div className="flex flex-col items-center justify-center py-40 text-center">
         <h2 className="text-xl font-bold">Habitación no encontrada</h2>
         <Link href="/">
-          <Button className="mt-4 bg-accent text-accent-foreground">Volver al inicio</Button>
+          <Button className="mt-4 bg-accent text-accent-foreground">
+            Volver al inicio
+          </Button>
         </Link>
       </div>
     )
@@ -242,7 +404,6 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
       </Link>
 
       <div className="grid gap-8 lg:grid-cols-5">
-        {/* Gallery */}
         <div className="lg:col-span-3">
           <div className="relative overflow-hidden rounded-2xl">
             <img
@@ -256,15 +417,16 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
                 <button
                   type="button"
                   onClick={prevImg}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+                  className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
                   aria-label="Foto anterior"
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
+
                 <button
                   type="button"
                   onClick={nextImg}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+                  className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
                   aria-label="Foto siguiente"
                 >
                   <ChevronRight className="h-5 w-5" />
@@ -280,7 +442,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
                   onClick={() => setImgIdx(i)}
                   className={cn(
                     "h-2 rounded-full transition-all",
-                    i === imgIdx ? "w-6 bg-accent" : "w-2 bg-white/60",
+                    i === imgIdx ? "w-6 bg-accent" : "w-2 bg-white/60"
                   )}
                   aria-label={`Ver foto ${i + 1}`}
                 />
@@ -296,20 +458,33 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
                 onClick={() => setImgIdx(i)}
                 className={cn(
                   "flex-shrink-0 overflow-hidden rounded-lg border-2 transition-all",
-                  i === imgIdx ? "border-accent" : "border-transparent opacity-60 hover:opacity-100",
+                  i === imgIdx
+                    ? "border-accent"
+                    : "border-transparent opacity-60 hover:opacity-100"
                 )}
               >
-                <img src={img || "/LOGO.PNG"} alt="" className="h-16 w-24 object-cover" />
+                <img
+                  src={img || "/LOGO.PNG"}
+                  alt=""
+                  className="h-16 w-24 object-cover"
+                />
               </button>
             ))}
           </div>
         </div>
 
-        {/* Details */}
         <div className="lg:col-span-2">
           <div className="rounded-2xl bg-card p-6 shadow-lg">
             <div className="mb-3 flex flex-wrap gap-2">
-              <Badge variant="secondary" className="capitalize">{room.type}</Badge>
+              <Badge variant="secondary" className="capitalize">
+                {room.type}
+              </Badge>
+
+              {hasCustomPrice && (
+                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                  Precio especial por fecha
+                </Badge>
+              )}
             </div>
 
             <h1 className="font-serif text-2xl font-bold text-card-foreground md:text-3xl">
@@ -321,45 +496,77 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
             </p>
 
             <div className="mt-6">
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold text-foreground">
-                ${roomPricePerNight.toLocaleString()}
-              </span>
-              <span className="text-muted-foreground">/ noche</span>
-            </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-extrabold text-foreground">
+                  {formatCOP(roomPricePerNight)}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  / noche promedio
+                </span>
+              </div>
 
+              <p className="mt-1 text-sm font-semibold text-foreground">
+                Total estadía: {formatCOP(totalStayPrice)}
+              </p>
 
-            {/* Desglose visual del precio */}
-              <div className="mt-2 rounded-xl bg-secondary/50 p-3 space-y-1.5">
+              <p className="text-xs text-muted-foreground">
+                {nightlyBreakdown.length} noche
+                {nightlyBreakdown.length !== 1 ? "s" : ""} seleccionada
+                {nightlyBreakdown.length !== 1 ? "s" : ""}
+              </p>
+
+              <div className="mt-3 rounded-xl bg-secondary/50 p-3 space-y-1.5">
                 {priceCalc.adultsPrice > 0 && (
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between gap-3 text-sm">
                     <span className="text-muted-foreground">
-                      {adultsInRoom} adulto{adultsInRoom > 1 ? "s" : ""} × ${Number(room.price).toLocaleString()}
+                      {adultsInRoom} adulto{adultsInRoom > 1 ? "s" : ""} ×{" "}
+                      {formatCOP(firstNightPrice)}
                     </span>
-                    <span className="font-medium">${priceCalc.adultsPrice.toLocaleString()}</span>
+                    <span className="font-medium">
+                      {formatCOP(priceCalc.adultsPrice)}
+                    </span>
                   </div>
                 )}
+
                 {priceCalc.kidsPrice > 0 && (
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between gap-3 text-sm">
                     <span className="text-emerald-600">
-                      {kidsInRoom} niño{kidsInRoom > 1 ? "s" : ""} × ${(Number(room.price) * 0.5).toLocaleString()}
+                      {kidsInRoom} niño{kidsInRoom > 1 ? "s" : ""} ×{" "}
+                      {formatCOP(firstNightKidsPrice)}
                     </span>
-                    <span className="font-medium text-emerald-600">${priceCalc.kidsPrice.toLocaleString()}</span>
+                    <span className="font-medium text-emerald-600">
+                      {formatCOP(priceCalc.kidsPrice)}
+                    </span>
                   </div>
                 )}
+
                 {priceCalc.petsPrice > 0 && (
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between gap-3 text-sm">
                     <span className="text-amber-600">
                       {petsInRoom} mascota{petsInRoom > 1 ? "s" : ""} × $30.000
                     </span>
-                    <span className="font-medium text-amber-600">${priceCalc.petsPrice.toLocaleString()}</span>
+                    <span className="font-medium text-amber-600">
+                      {formatCOP(priceCalc.petsPrice)}
+                    </span>
                   </div>
                 )}
+
                 {priceCalc.kidsDiscount > 0 && (
-                  <div className="flex justify-between text-sm border-t border-border pt-1.5">
-                    <span className="text-emerald-600 font-medium">Descuento niños</span>
-                    <span className="font-medium text-emerald-600">-${priceCalc.kidsDiscount.toLocaleString()}</span>
+                  <div className="flex justify-between gap-3 border-t border-border pt-1.5 text-sm">
+                    <span className="font-medium text-emerald-600">
+                      Descuento niños
+                    </span>
+                    <span className="font-medium text-emerald-600">
+                      -{formatCOP(priceCalc.kidsDiscount)}
+                    </span>
                   </div>
+                )}
+
+                {hasCustomPrice && (
+                  <p className="border-t border-border pt-2 text-xs font-medium text-emerald-600">
+                    El precio fue calculado con las tarifas reales de las fechas
+                    seleccionadas.
+                  </p>
                 )}
               </div>
             </div>
@@ -370,13 +577,22 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
                 <span className="text-xs text-muted-foreground">Capacidad</span>
                 <p className="text-sm font-bold">{room.capacity} personas</p>
               </div>
+
               <div className="rounded-xl bg-secondary p-3 text-center">
                 <Bed className="mx-auto mb-1 h-5 w-5 text-accent" />
                 <span className="text-xs text-muted-foreground">Camas</span>
                 <p className="text-sm font-bold">
-                  {room.singleBeds > 0 ? `${room.singleBeds} sencilla${room.singleBeds > 1 ? "s" : ""}` : ""}
+                  {room.singleBeds > 0
+                    ? `${room.singleBeds} sencilla${
+                        room.singleBeds > 1 ? "s" : ""
+                      }`
+                    : ""}
                   {room.singleBeds > 0 && room.doubleBeds > 0 ? " + " : ""}
-                  {room.doubleBeds > 0 ? `${room.doubleBeds} doble${room.doubleBeds > 1 ? "s" : ""}` : ""}
+                  {room.doubleBeds > 0
+                    ? `${room.doubleBeds} doble${
+                        room.doubleBeds > 1 ? "s" : ""
+                      }`
+                    : ""}
                 </p>
               </div>
             </div>
@@ -398,7 +614,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
                 ))}
               </div>
             </div>
-            {/* Badges informativos */}
+
             {(kidsInRoom > 0 || petsInRoom > 0) && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {kidsInRoom > 0 && (
@@ -406,9 +622,10 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
                     ✓ Descuento niños aplicado
                   </Badge>
                 )}
+
                 {petsInRoom > 0 && (
                   <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs">
-                    +${priceCalc.petsPrice.toLocaleString()} por mascotas
+                    +{formatCOP(priceCalc.petsPrice)} por mascotas
                   </Badge>
                 )}
               </div>
@@ -416,7 +633,7 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
 
             <Button
               onClick={handleSelect}
-              className="mt-8 w-full bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl py-3 h-auto text-base font-bold"
+              className="mt-8 h-auto w-full rounded-xl bg-accent py-3 text-base font-bold text-accent-foreground hover:bg-accent/90"
             >
               Seleccionar Habitación
             </Button>
@@ -427,11 +644,17 @@ function RoomDetailContent({ roomId }: { roomId: string }) {
   )
 }
 
-export default function RoomDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function RoomDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
   const { id } = use(params)
+
   return (
     <main>
       <PublicHeader />
+
       <div className="pt-20">
         <Suspense
           fallback={
@@ -443,6 +666,7 @@ export default function RoomDetailPage({ params }: { params: Promise<{ id: strin
           <RoomDetailContent roomId={id} />
         </Suspense>
       </div>
+
       <PublicFooter />
     </main>
   )

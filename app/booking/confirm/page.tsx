@@ -221,26 +221,12 @@ export default function BookingConfirmPage() {
   const roomsPerNight = isExtraBooking
     ? 0
     : selectedRooms.reduce((sum: number, r: any) => {
-      // Usar el priceBreakdown si existe, sino calcular
-      if (r.priceBreakdown) {
-        return sum + r.priceBreakdown.total
-      }
-      const selectedPeople = Number(r.selectedPeople ?? 1)
-      const selectedAdults = Number(r.selectedAdults ?? selectedPeople)
-      const selectedKids = Number(r.selectedKids ?? 0)
-      
-      const priceCalc = calculateRoomPrice(
-        Number(r.price ?? 0),
-        selectedAdults,
-        selectedKids
-      )
-      
-      return sum + priceCalc.total
-    }, 0)
+        return sum + Number(r.selectedTotalPrice ?? r.priceBreakdown?.total ?? 0)
+      }, 0)
+
+  const roomsTotal = isExtraBooking ? 0 : roomsPerNight
 
 
-
-  const roomsTotal = isExtraBooking ? 0 : roomsPerNight * nights
 
   const svcDetails = isExtraBooking
     ? []
@@ -890,11 +876,29 @@ export default function BookingConfirmPage() {
                   const name = room.nameRoom ?? room.name ?? "Habitación"
                   const type = room.type ?? ""
 
-                  const priceCalc = room.priceBreakdown ?? calculateRoomPrice(
-                    Number(room.price ?? 0),
-                    Number(room.selectedAdults ?? room.selectedPeople ?? 1),
-                    Number(room.selectedKids ?? 0)
-                  )
+                  const priceCalc =
+                    room.priceBreakdown ??
+                    calculateRoomPrice(
+                      Number(room.selectedPricePerNight ?? room.price ?? 0),
+                      Number(room.selectedAdults ?? room.selectedPeople ?? 1),
+                      Number(room.selectedKids ?? 0),
+                      Number(room.selectedPets ?? 0)
+                    )
+
+                    const firstNightPrice = Number(
+                      room.nightlyBreakdown?.[0]?.basePrice ??
+                      room.selectedBasePrice ??
+                      room.price ??
+                      0
+                    )
+
+                    const kidsNightPrice = firstNightPrice * 0.7
+
+                    const roomTotal =
+                      Number(room.selectedTotalPrice ?? priceCalc.total ?? 0)
+
+                    const roomAveragePerNight =
+                      Number(room.selectedPricePerNight ?? priceCalc.total ?? 0)
 
                   return (
                     <div key={room.id} className="flex gap-4">
@@ -911,34 +915,53 @@ export default function BookingConfirmPage() {
                         </p>
 
                   {/* Desglose de precio */}
-                          <div className="mt-2 space-y-1">
-                            <p className="text-sm font-bold">
-                              ${priceCalc.total.toLocaleString()}
-                              <span className="font-normal text-muted-foreground"> / noche</span>
-                            </p>
-                            
-                            <div className="text-[11px] text-muted-foreground space-y-0.5">
-                              {priceCalc.adultsPrice > 0 && (
-                                <p>${Number(room.price).toLocaleString()} × adulto</p>
-                              )}
-                              {priceCalc.kidsPrice > 0 && (
-                                <p className="text-emerald-600">
-                                  ${(Number(room.price) * 0.5).toLocaleString()} × niño (50% dto)
-                                </p>
-                              )}
-                            </div>
-                          </div>
+                  <div className="mt-3 rounded-xl bg-secondary/50 p-3">
+                    <p className="text-base font-extrabold text-foreground">
+                      {formatCurrencyCOP(roomAveragePerNight)}
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">
+                        / noche promedio
+                      </span>
+                    </p>
 
-                        <p className="mt-1 text-sm font-bold">
-                          {(
-                            room.selectedPricePerNight ??
-                            Number(room.price ?? 0) * Number(room.selectedPeople ?? 1)
-                          ).toLocaleString()}
-                          <span className="font-normal text-muted-foreground"> / noche</span>
+                    {roomTotal > 0 && (
+                      <p className="mt-1 text-xs font-semibold text-foreground">
+                        Total habitación: {formatCurrencyCOP(roomTotal)}
+                      </p>
+                    )}
+
+                    <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+                      {priceCalc.adultsPrice > 0 && (
+                        <p>
+                          {Number(room.selectedAdults ?? room.selectedPeople ?? 1)} adulto
+                          {Number(room.selectedAdults ?? room.selectedPeople ?? 1) > 1 ? "s" : ""} ×{" "}
+                          {formatCurrencyCOP(firstNightPrice)}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          {Number(room.price ?? 0).toLocaleString()} x persona
+                      )}
+
+                      {priceCalc.kidsPrice > 0 && (
+                        <p className="text-emerald-600">
+                          {Number(room.selectedKids ?? 0)} niño
+                          {Number(room.selectedKids ?? 0) > 1 ? "s" : ""} ×{" "}
+                          {formatCurrencyCOP(kidsNightPrice)}
                         </p>
+                      )}
+
+                      {priceCalc.petsPrice > 0 && (
+                        <p className="text-amber-600">
+                          {Number(room.selectedPets ?? 0)} mascota
+                          {Number(room.selectedPets ?? 0) > 1 ? "s" : ""} × $30.000
+                        </p>
+                      )}
+
+                      {room.hasCustomPrice && (
+                        <p className="font-medium text-emerald-600">
+                          Incluye precio especial por fecha
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                          
+
                       </div>
                     </div>
                   )
@@ -946,8 +969,7 @@ export default function BookingConfirmPage() {
               </div>
 
               <p className="mt-4 text-sm font-bold">
-                Total habitaciones: {formatCurrencyCOP(roomsPerNight)} x {nights} noche
-                {nights > 1 ? "s" : ""} ={" "}
+                Total habitaciones:{" "}
                 <span className="text-accent">{formatCurrencyCOP(roomsTotal)}</span>
               </p>
             </div>

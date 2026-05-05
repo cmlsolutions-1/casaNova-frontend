@@ -61,6 +61,21 @@ export type RoomDailyPrice = {
   isOverride: boolean
 }
 
+export async function getRoomDailyPricesPublicService(params: {
+  roomId: string
+  start: string
+  end: string
+}) {
+  const q = new URLSearchParams({
+    start: params.start,
+    end: params.end,
+  })
+
+  return apiFetch<RoomDailyPrice[]>(
+    `/api/room/${params.roomId}/daily-prices?${q.toString()}`
+  )
+}
+
 export type UpdateRoomDailyPricesBody = {
   prices: {
     date: string

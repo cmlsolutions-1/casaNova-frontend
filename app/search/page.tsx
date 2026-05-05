@@ -11,10 +11,36 @@ import { Button } from "@/components/ui/button"
 import { Bed, Users, ArrowLeft, SearchX } from "lucide-react"
 import Link from "next/link"
 
-import { listAvailableRoomsPublicService, type BackendRoom } from "@/services/room.service"
+import {
+  listAvailableRoomsPublicService,
+  getRoomDailyPricesPublicService,
+  type BackendRoom,
+  type RoomDailyPrice,
+} from "@/services/room.service"
+
 import { parseISO, format } from "date-fns"
 import { es } from "date-fns/locale"
 import { calculateRoomPrice } from "@/utils/price-calculator"
+
+
+function getNightsBetween(start: string, end: string) {
+  const startDate = new Date(`${start}T12:00:00`)
+  const endDate = new Date(`${end}T12:00:00`)
+
+  const dates: string[] = []
+  const current = new Date(startDate)
+
+  while (current < endDate) {
+    const year = current.getFullYear()
+    const month = String(current.getMonth() + 1).padStart(2, "0")
+    const day = String(current.getDate()).padStart(2, "0")
+
+    dates.push(`${year}-${month}-${day}`)
+    current.setDate(current.getDate() + 1)
+  }
+
+  return dates
+}
 
 function SearchResults() {
   const searchParams = useSearchParams()
@@ -34,6 +60,10 @@ function SearchResults() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [dailyPricesByRoom, setDailyPricesByRoom] = useState<
+  Record<string, RoomDailyPrice[]>
+>({})
+
   const [editingSearch, setEditingSearch] = useState(!start || !end)
   const [localSearch, setLocalSearch] = useState({
     start: start || "",
@@ -44,6 +74,7 @@ function SearchResults() {
     pets: pets || 0,
   })
 
+  
   const returnTo = searchParams.get("returnTo") || ""
 
   const prettyRange = useMemo(() => {
@@ -64,69 +95,129 @@ function SearchResults() {
   }, [booking.selectedRooms, returnTo])
 
   useEffect(() => {
-    let alive = true
-    if (!start || !end || !people) {
+  let alive = true
+
+  if (!start || !end || !people) {
+    setRooms([])
+    setDailyPricesByRoom({})
+    setLoading(false)
+    return
+  }
+
+  setLoading(true)
+  setError(null)
+
+  ;(async () => {
+    try {
+      const data = await listAvailableRoomsPublicService({
+        start,
+        end,
+        people,
+      })
+
+      if (!alive) return
+
+      const filtered = (data ?? [])
+        .filter((r) => r.status === "ACTIVE")
+        .filter((r) => !selectedIds.has(String(r.id)))
+
+      setRooms(filtered)
+
+      const pricesEntries = await Promise.all(
+        filtered.map(async (room) => {
+          const prices = await getRoomDailyPricesPublicService({
+            roomId: room.id,
+            start,
+            end,
+          })
+
+          return [room.id, prices] as const
+        })
+      )
+
+      if (!alive) return
+
+      setDailyPricesByRoom(Object.fromEntries(pricesEntries))
+    } catch (e: any) {
+      if (!alive) return
+      setError(e?.message ?? "Error buscando habitaciones")
       setRooms([])
-      setLoading(false)
-      return
+      setDailyPricesByRoom({})
+    } finally {
+      if (alive) setLoading(false)
     }
+  })()
 
-    setLoading(true)
-    setError(null)
-
-    ;(async () => {
-      try {
-        const data = await listAvailableRoomsPublicService({ start, end, people })
-        if (!alive) return
-        const filtered = (data ?? [])
-          .filter((r) => r.status === "ACTIVE")
-          .filter((r) => !selectedIds.has(String(r.id)))
-        setRooms(filtered)
-      } catch (e: any) {
-        if (!alive) return
-        setError(e?.message ?? "Error buscando habitaciones")
-        setRooms([])
-      } finally {
-        if (alive) setLoading(false)
-      }
-    })()
-
-    return () => { alive = false }
-  }, [start, end, people, selectedIds])
+  return () => {
+    alive = false
+  }
+}, [start, end, people, selectedIds])
 
   // Calcular distribución de huéspedes y mascotas por habitación
   const roomsWithDistribution = useMemo(() => {
-    return rooms.map((room) => {
+  const nights = getNightsBetween(start, end)
+  const totalNights = Math.max(nights.length, 1)
+
+  return rooms.map((room) => {
     const capacity = room.capacity ?? 0
-    
-    // Cada habitación puede alojar hasta su capacidad o el total de personas buscadas
+
     const peopleForThisRoom = Math.min(capacity, adults + kids)
 
-    // Distribución independiente para esta habitación
     const adultsInRoom = Math.min(adults, peopleForThisRoom)
     const remainingCapacityAfterAdults = peopleForThisRoom - adultsInRoom
     const kidsInRoom = Math.min(kids, remainingCapacityAfterAdults)
-    
-    // Las mascotas se asignan independientemente (hasta la capacidad de la habitación)
+
     const petsInRoom = Math.min(pets, capacity)
 
-    const priceCalc = calculateRoomPrice(
-      Number(room.price ?? 0),
-      adultsInRoom,
-      kidsInRoom,
-      petsInRoom
+    const roomDailyPrices = dailyPricesByRoom[room.id] ?? []
+
+    const pricesMap = new Map(
+      roomDailyPrices.map((item) => [item.date, item])
     )
 
-      return {
-        ...room,
+    const nightlyBreakdown = nights.map((date) => {
+      const daily = pricesMap.get(date)
+
+      const realBasePrice = Number(daily?.price ?? room.price ?? 0)
+
+      const priceCalc = calculateRoomPrice(
+        realBasePrice,
         adultsInRoom,
         kidsInRoom,
-        petsInRoom,
+        petsInRoom
+      )
+
+      return {
+        date,
+        basePrice: realBasePrice,
+        isOverride: daily?.isOverride === true,
+        total: priceCalc.total,
         priceCalc,
-        roomPricePerNight: priceCalc.total,
       }
     })
-  }, [rooms, adults, kids, pets])
+
+    const totalStayPrice = nightlyBreakdown.reduce(
+      (acc, item) => acc + item.total,
+      0
+    )
+
+    const roomPricePerNight = Math.round(totalStayPrice / totalNights)
+
+    const hasCustomPrice = nightlyBreakdown.some((item) => item.isOverride)
+
+    return {
+      ...room,
+      adultsInRoom,
+      kidsInRoom,
+      petsInRoom,
+      nightlyBreakdown,
+      totalStayPrice,
+      roomPricePerNight,
+      hasCustomPrice,
+      priceCalc: nightlyBreakdown[0]?.priceCalc,
+    }
+  })
+}, [rooms, adults, kids, pets, start, end, dailyPricesByRoom])
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
@@ -301,14 +392,24 @@ function SearchResults() {
         </div>
       )}
 
-      {/* ✅ CAMBIO: Usar roomsWithDistribution en lugar de rooms */}
       {!loading && !error && roomsWithDistribution.length > 0 && (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {roomsWithDistribution.map((room) => {
             const img = room.images?.[0]?.url || "/placeholder.svg"
             
-            // ✅ Usar valores precalculados
-            const { adultsInRoom, kidsInRoom, petsInRoom, priceCalc, roomPricePerNight } = room
+            // Usar valores precalculados
+           const {
+              adultsInRoom,
+              kidsInRoom,
+              petsInRoom,
+              priceCalc,
+              roomPricePerNight,
+              totalStayPrice,
+              nightlyBreakdown,
+            } = room
+
+            const firstNight = nightlyBreakdown?.[0]
+            const firstNightPrice = Number(firstNight?.basePrice ?? room.price ?? 0)
 
             return (
               <div
@@ -327,21 +428,31 @@ function SearchResults() {
                   <div className="mb-2 flex items-center justify-between">
                     <Badge variant="secondary" className="capitalize text-xs">{room.type}</Badge>
                     <div className="text-right">
-                      <span className="text-xl font-bold text-foreground">
-                        ${roomPricePerNight.toLocaleString()}
-                      </span>
-                      <p className="text-xs text-muted-foreground">/ noche</p>
 
-                      {/* ✅ Desglose visual del precio con mascotas */}
+                        <p className="text-2xl font-extrabold leading-tight text-foreground">
+                            ${roomPricePerNight.toLocaleString()}
+                          </p>
+
+                          <p className="mt-1 text-sm font-semibold text-foreground">
+                            Total estadía: ${totalStayPrice.toLocaleString()}
+                          </p>
+
+                        {room.hasCustomPrice && (
+                          <p className="text-[10px] font-medium text-emerald-600">
+                            Incluye precio especial por fecha
+                          </p>
+                        )}
+
+                      {/* Desglose visual del precio con mascotas */}
                       <div className="mt-1 text-[10px] text-muted-foreground space-y-0.5">
                         {adultsInRoom > 0 && (
                           <p>
-                            {adultsInRoom} adulto{adultsInRoom > 1 ? "s" : ""} × ${Number(room.price).toLocaleString()} = ${priceCalc.adultsPrice.toLocaleString()}
+                            {adultsInRoom} adulto{adultsInRoom > 1 ? "s" : ""} × ${firstNightPrice.toLocaleString()} = ${priceCalc.adultsPrice.toLocaleString()}
                           </p>
                         )}
                         {kidsInRoom > 0 && (
                           <p className="text-emerald-600 font-medium">
-                            {kidsInRoom} niño{kidsInRoom > 1 ? "s" : ""} × ${(Number(room.price) * 0.5).toLocaleString()} = ${priceCalc.kidsPrice.toLocaleString()}
+                            {kidsInRoom} niño{kidsInRoom > 1 ? "s" : ""} × ${(firstNightPrice * 0.7).toLocaleString()} = ${priceCalc.kidsPrice.toLocaleString()}
                           </p>
                         )}
                         {petsInRoom > 0 && (

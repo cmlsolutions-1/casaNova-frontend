@@ -449,7 +449,7 @@ export function PricesByDate() {
                         isSelected(day) &&
                           "border-primary bg-primary/10 ring-2 ring-primary",
                         isCustomPrice(day)
-                          ? "border-primary/30 bg-primary/5"
+                          ? "border-red-400 bg-red-50"
                           : "border-border bg-card"
                       )}
                     >
@@ -457,8 +457,8 @@ export function PricesByDate() {
                         className={cn(
                           "text-xs font-medium sm:text-sm",
                           isCustomPrice(day)
-                            ? "text-primary"
-                            : "text-foreground"
+                          ? "text-red-600 font-semibold"
+                          : "text-foreground"
                         )}
                       >
                         {day}
@@ -467,9 +467,9 @@ export function PricesByDate() {
                       <span
                         className={cn(
                           "w-full truncate text-center text-[10px] sm:text-xs",
-                          isCustomPrice(day)
-                            ? "font-medium text-primary"
-                            : "text-muted-foreground"
+                            isCustomPrice(day)
+                              ? "font-semibold text-red-600"
+                              : "text-muted-foreground"
                         )}
                       >
                         {formatCOP(getDayPrice(day))
@@ -491,8 +491,8 @@ export function PricesByDate() {
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="h-4 w-4 rounded border border-primary/30 bg-primary/5" />
-                <span className="text-xs text-muted-foreground">
+                <div className="h-4 w-4 rounded border border-red-400 bg-red-50" />
+                <span className="text-xs font-medium text-red-600">
                   Precio personalizado
                 </span>
               </div>
