@@ -174,3 +174,38 @@ export async function listAvailableRoomsPublicService(params: {
   return apiFetch<BackendRoom[]>(`/api/room/available?${q.toString()}`)
 }
 
+
+export type RoomAvailabilityDay = {
+  date: string
+  isAvailable: boolean
+}
+
+export async function getRoomAvailabilityPublicService(params: {
+  roomId: string
+  start: string
+  end: string
+}) {
+  const q = new URLSearchParams({
+    start: params.start,
+    end: params.end,
+  })
+
+  return apiFetch<RoomAvailabilityDay[]>(
+    `/api/room/${params.roomId}/availability?${q.toString()}`
+  )
+}
+
+export async function updateRoomAvailabilityService(
+  roomId: string,
+  body: {
+    startDate: string
+    endDate: string
+    isAvailable: boolean
+  }
+) {
+  return apiFetch<RoomAvailabilityDay[]>(`/api/room/${roomId}/availability`, {
+    method: "PUT",
+    auth: true,
+    body: JSON.stringify(body),
+  })
+}

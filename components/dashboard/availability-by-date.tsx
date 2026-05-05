@@ -1,7 +1,14 @@
+// component/dashboard/availability-by-date.tsx
 "use client"
 
-import { useState, useMemo } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { useEffect, useMemo, useState } from "react"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
@@ -29,30 +36,55 @@ import {
   Check,
   Lock,
   Unlock,
+  Loader2,
 } from "lucide-react"
-import {
-  rooms,
-  initialBlocks,
-  blockReasons,
-  formatDate,
-  getMonthName,
-  getDaysInMonth,
-  getFirstDayOfMonth,
-  type RoomBlock,
-} from "@/lib/hotel-data"
+
 import { cn } from "@/lib/utils"
+import {
+  listRoomsService,
+  getRoomAvailabilityPublicService,
+  updateRoomAvailabilityService,
+  type BackendRoom,
+  type RoomAvailabilityDay,
+} from "@/services/room.service"
+
+const formatDate = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+
+  return `${year}-${month}-${day}`
+}
+
+const getMonthName = (month: number) =>
+  new Date(2026, month, 1).toLocaleDateString("es-CO", {
+    month: "long",
+  })
+
+const getDaysInMonth = (year: number, month: number) =>
+  new Date(year, month + 1, 0).getDate()
+
+const getFirstDayOfMonth = (year: number, month: number) =>
+  new Date(year, month, 1).getDay()
 
 export function AvailabilityByDate() {
-  const [selectedRoom, setSelectedRoom] = useState(rooms[1].id) // Room 102 has blocks
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 1)) // April 2026
-  const [blocks, setBlocks] = useState<RoomBlock[]>(initialBlocks)
+  const [rooms, setRooms] = useState<BackendRoom[]>([])
+  const [selectedRoom, setSelectedRoom] = useState("")
+  const [currentDate, setCurrentDate] = useState(new Date())
+
+  const [availabilityDays, setAvailabilityDays] = useState<RoomAvailabilityDay[]>([])
   const [selectedDays, setSelectedDays] = useState<string[]>([])
+
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedReason, setSelectedReason] = useState(blockReasons[0])
   const [isMultiSelect, setIsMultiSelect] = useState(false)
   const [dialogMode, setDialogMode] = useState<"block" | "unblock">("block")
 
-  const room = rooms.find((r) => r.id === selectedRoom)!
+  const [isLoadingRooms, setIsLoadingRooms] = useState(false)
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const room = rooms.find((r) => r.id === selectedRoom)
+
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
 
@@ -60,35 +92,89 @@ export function AvailabilityByDate() {
   const firstDay = getFirstDayOfMonth(year, month)
   const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
 
-  // Get blocks for current room and month
-  const monthBlocks = useMemo(() => {
-    const blockMap: Record<string, string> = {}
-    blocks
-      .filter((b) => b.roomId === selectedRoom)
-      .forEach((b) => {
-        const date = new Date(b.date)
-        if (date.getFullYear() === year && date.getMonth() === month) {
-          blockMap[b.date] = b.reason
-        }
-      })
-    return blockMap
-  }, [blocks, selectedRoom, year, month])
+  useEffect(() => {
+    const loadRooms = async () => {
+      setIsLoadingRooms(true)
 
-  // Calculate stats
+      try {
+        const data = await listRoomsService()
+        setRooms(data)
+
+        if (data.length > 0) {
+          setSelectedRoom(data[0].id)
+        }
+      } finally {
+        setIsLoadingRooms(false)
+      }
+    }
+
+    loadRooms()
+  }, [])
+
+  useEffect(() => {
+    if (!selectedRoom) return
+
+    const loadAvailability = async () => {
+      setIsLoadingAvailability(true)
+
+      try {
+        const start = formatDate(new Date(year, month, 1))
+        const end = formatDate(new Date(year, month, daysInMonth))
+
+        const data = await getRoomAvailabilityPublicService({
+          roomId: selectedRoom,
+          start,
+          end,
+        })
+
+        setAvailabilityDays(data)
+      } finally {
+        setIsLoadingAvailability(false)
+      }
+    }
+
+    loadAvailability()
+  }, [selectedRoom, year, month, daysInMonth])
+
+  const availabilityMap = useMemo(() => {
+    const map: Record<string, RoomAvailabilityDay> = {}
+
+    availabilityDays.forEach((item) => {
+      map[item.date] = item
+    })
+
+    return map
+  }, [availabilityDays])
+
+  const monthBlocks = useMemo(() => {
+    const blockMap: Record<string, boolean> = {}
+
+    availabilityDays.forEach((item) => {
+      if (item.isAvailable === false) {
+        blockMap[item.date] = true
+      }
+    })
+
+    return blockMap
+  }, [availabilityDays])
+
   const stats = useMemo(() => {
     const blockedDays = Object.keys(monthBlocks).length
     const availableDays = daysInMonth - blockedDays
 
-    // Find next blocked date
     const today = new Date()
-    const sortedBlockDates = blocks
-      .filter((b) => b.roomId === selectedRoom && new Date(b.date) >= today)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    today.setHours(0, 0, 0, 0)
 
-    const nextBlocked = sortedBlockDates[0]?.date
+    const nextBlocked = Object.keys(monthBlocks)
+      .filter((date) => new Date(`${date}T12:00:00`) >= today)
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0]
 
-    return { blockedDays, availableDays, nextBlocked }
-  }, [monthBlocks, daysInMonth, blocks, selectedRoom])
+    return {
+      blockedDays,
+      availableDays,
+      nextBlocked,
+    }
+  }, [monthBlocks, daysInMonth])
 
   const handlePrevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1))
@@ -102,12 +188,7 @@ export function AvailabilityByDate() {
 
   const isBlocked = (day: number): boolean => {
     const dateStr = formatDate(new Date(year, month, day))
-    return dateStr in monthBlocks
-  }
-
-  const getBlockReason = (day: number): string | undefined => {
-    const dateStr = formatDate(new Date(year, month, day))
-    return monthBlocks[dateStr]
+    return availabilityMap[dateStr]?.isAvailable === false
   }
 
   const isSelected = (day: number): boolean => {
@@ -124,92 +205,151 @@ export function AvailabilityByDate() {
           ? prev.filter((d) => d !== dateStr)
           : [...prev, dateStr]
       )
-    } else {
-      setSelectedDays([dateStr])
-      setDialogMode(isBlocked(day) ? "unblock" : "block")
-      setIsDialogOpen(true)
+      return
     }
+
+    setSelectedDays([dateStr])
+    setDialogMode(isBlocked(day) ? "unblock" : "block")
+    setIsDialogOpen(true)
   }
 
   const handleOpenMultiEditDialog = (mode: "block" | "unblock") => {
-    if (selectedDays.length > 0) {
-      setDialogMode(mode)
-      setIsDialogOpen(true)
+    if (selectedDays.length === 0) return
+
+    setDialogMode(mode)
+    setIsDialogOpen(true)
+  }
+
+  const updateSelectedAvailability = async (isAvailable: boolean) => {
+    if (!room || selectedDays.length === 0) return
+
+    setIsSaving(true)
+
+    try {
+      await Promise.all(
+        selectedDays.map((date) =>
+          updateRoomAvailabilityService(room.id, {
+            startDate: date,
+            endDate: date,
+            isAvailable,
+          })
+        )
+      )
+
+      setAvailabilityDays((prev) => {
+        const selectedSet = new Set(selectedDays)
+        const filtered = prev.filter((item) => !selectedSet.has(item.date))
+
+        const updated = selectedDays.map((date) => ({
+          date,
+          isAvailable,
+        }))
+
+        return [...filtered, ...updated]
+      })
+
+      setIsDialogOpen(false)
+      setSelectedDays([])
+      setIsMultiSelect(false)
+    } finally {
+      setIsSaving(false)
     }
   }
 
   const handleBlockDays = () => {
-    setBlocks((prev) => {
-      const newBlocks = prev.filter(
-        (b) => !(b.roomId === selectedRoom && selectedDays.includes(b.date))
-      )
-      selectedDays.forEach((date) => {
-        newBlocks.push({ roomId: selectedRoom, date, reason: selectedReason })
-      })
-      return newBlocks
-    })
-    setIsDialogOpen(false)
-    setSelectedDays([])
-    setIsMultiSelect(false)
+    updateSelectedAvailability(false)
   }
 
   const handleUnblockDays = () => {
-    setBlocks((prev) =>
-      prev.filter(
-        (b) => !(b.roomId === selectedRoom && selectedDays.includes(b.date))
-      )
-    )
-    setIsDialogOpen(false)
-    setSelectedDays([])
-    setIsMultiSelect(false)
+    updateSelectedAvailability(true)
   }
 
-  // Generate calendar grid
-  const calendarDays = []
+  const calendarDays: Array<number | null> = []
+
   for (let i = 0; i < firstDay; i++) {
     calendarDays.push(null)
   }
+
   for (let day = 1; day <= daysInMonth; day++) {
     calendarDays.push(day)
   }
 
-  // Count selected blocked/available
-  const selectedBlocked = selectedDays.filter((d) => d in monthBlocks).length
+  const selectedBlocked = selectedDays.filter((date) => {
+    return availabilityMap[date]?.isAvailable === false
+  }).length
+
   const selectedAvailable = selectedDays.length - selectedBlocked
+
+  if (isLoadingRooms) {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Cargando habitaciones...
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!room) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-sm text-muted-foreground">
+            No hay habitaciones disponibles.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className="space-y-6">
-      {/* Controls */}
       <Card>
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <CalendarOff className="w-5 h-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <CalendarOff className="h-5 w-5 text-primary" />
             Disponibilidad por Fecha
           </CardTitle>
+
           <CardDescription>
-            Bloquea o habilita habitaciones para días específicos
+            Bloquea o habilita habitaciones para días específicos.
           </CardDescription>
         </CardHeader>
+
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row">
             <div className="flex-1">
-              <Label htmlFor="room-select-avail" className="text-sm font-medium mb-2 block">
+              <Label
+                htmlFor="room-select-avail"
+                className="mb-2 block text-sm font-medium"
+              >
                 Habitación
               </Label>
-              <Select value={selectedRoom} onValueChange={setSelectedRoom}>
+
+              <Select
+                value={selectedRoom}
+                onValueChange={(value) => {
+                  setSelectedRoom(value)
+                  setSelectedDays([])
+                  setIsMultiSelect(false)
+                }}
+              >
                 <SelectTrigger id="room-select-avail" className="w-full">
-                  <SelectValue />
+                  <SelectValue placeholder="Selecciona una habitación" />
                 </SelectTrigger>
+
                 <SelectContent>
                   {rooms.map((r) => (
                     <SelectItem key={r.id} value={r.id}>
-                      {r.name} ({r.type})
+                      {r.nameRoom} ({r.type})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end gap-2 flex-wrap">
+
+            <div className="flex flex-wrap items-end gap-2">
               <Button
                 variant={isMultiSelect ? "default" : "outline"}
                 size="sm"
@@ -220,13 +360,14 @@ export function AvailabilityByDate() {
               >
                 {isMultiSelect ? (
                   <>
-                    <Check className="w-4 h-4 mr-1" />
+                    <Check className="mr-1 h-4 w-4" />
                     Selección múltiple
                   </>
                 ) : (
                   "Selección múltiple"
                 )}
               </Button>
+
               {isMultiSelect && selectedDays.length > 0 && (
                 <>
                   {selectedAvailable > 0 && (
@@ -235,17 +376,18 @@ export function AvailabilityByDate() {
                       variant="destructive"
                       onClick={() => handleOpenMultiEditDialog("block")}
                     >
-                      <Lock className="w-4 h-4 mr-1" />
+                      <Lock className="mr-1 h-4 w-4" />
                       Bloquear ({selectedAvailable})
                     </Button>
                   )}
+
                   {selectedBlocked > 0 && (
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => handleOpenMultiEditDialog("unblock")}
                     >
-                      <Unlock className="w-4 h-4 mr-1" />
+                      <Unlock className="mr-1 h-4 w-4" />
                       Desbloquear ({selectedBlocked})
                     </Button>
                   )}
@@ -256,68 +398,82 @@ export function AvailabilityByDate() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Calendar */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <Button variant="ghost" size="icon" onClick={handlePrevMonth}>
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="h-5 w-5" />
               </Button>
-              <h3 className="text-lg font-semibold">
-                {getMonthName(month)} {year}
-              </h3>
+
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold capitalize">
+                  {getMonthName(month)} {year}
+                </h3>
+
+                {isLoadingAvailability && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+
               <Button variant="ghost" size="icon" onClick={handleNextMonth}>
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="h-5 w-5" />
               </Button>
             </div>
           </CardHeader>
+
           <CardContent>
-            {/* Day names */}
-            <div className="grid grid-cols-7 gap-1 mb-2">
+            <div className="mb-2 grid grid-cols-7 gap-1">
               {dayNames.map((name) => (
                 <div
                   key={name}
-                  className="text-center text-xs font-medium text-muted-foreground py-2"
+                  className="py-2 text-center text-xs font-medium text-muted-foreground"
                 >
                   {name}
                 </div>
               ))}
             </div>
 
-            {/* Calendar grid */}
             <div className="grid grid-cols-7 gap-1">
               {calendarDays.map((day, index) => (
                 <div key={index} className="aspect-square">
                   {day && (
                     <button
                       onClick={() => handleDayClick(day)}
+                      disabled={isLoadingAvailability}
                       className={cn(
-                        "w-full h-full rounded-lg border transition-all flex flex-col items-center justify-center gap-0.5 p-1 relative",
-                        "hover:border-primary/50",
-                        isSelected(day) && "ring-2 ring-primary border-primary",
+                        "relative flex h-full w-full flex-col items-center justify-center gap-0.5 rounded-lg border p-1 transition-all",
+                        "disabled:pointer-events-none disabled:opacity-60",
+                        isSelected(day) &&
+                          "border-primary ring-2 ring-primary",
                         isBlocked(day)
-                          ? "bg-destructive/10 border-destructive/30"
-                          : "border-border bg-card hover:bg-accent/50"
+                          ? "border-red-400 bg-red-50 hover:bg-red-100"
+                          : "border-border bg-card hover:border-emerald-400 hover:bg-emerald-50"
                       )}
                     >
                       <span
                         className={cn(
-                          "text-xs sm:text-sm font-medium",
-                          isBlocked(day) ? "text-destructive" : "text-foreground"
+                          "text-xs font-semibold sm:text-sm",
+                          isBlocked(day)
+                            ? "text-red-700"
+                            : "text-foreground"
                         )}
                       >
                         {day}
                       </span>
+
                       {isBlocked(day) ? (
-                        <Lock className="w-3 h-3 text-destructive" />
+                        <Lock className="h-3 w-3 text-red-600" />
                       ) : (
-                        <CalendarCheck className="w-3 h-3 text-success" />
+                        <CalendarCheck className="h-3 w-3 text-emerald-600" />
                       )}
+
                       <span
                         className={cn(
-                          "text-[8px] sm:text-[10px] truncate w-full text-center",
-                          isBlocked(day) ? "text-destructive/70" : "text-success"
+                          "w-full truncate text-center text-[8px] font-medium sm:text-[10px]",
+                          isBlocked(day)
+                            ? "text-red-700"
+                            : "text-emerald-600"
                         )}
                       >
                         {isBlocked(day) ? "Bloqueado" : "Disponible"}
@@ -328,85 +484,116 @@ export function AvailabilityByDate() {
               ))}
             </div>
 
-            {/* Legend */}
-            <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t">
+            <div className="mt-4 flex flex-wrap items-center gap-4 border-t pt-4">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded border border-border bg-card flex items-center justify-center">
-                  <CalendarCheck className="w-2.5 h-2.5 text-success" />
+                <div className="flex h-4 w-4 items-center justify-center rounded border border-border bg-card">
+                  <CalendarCheck className="h-2.5 w-2.5 text-emerald-600" />
                 </div>
-                <span className="text-xs text-muted-foreground">Disponible</span>
+                <span className="text-xs text-muted-foreground">
+                  Disponible
+                </span>
               </div>
+
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded border border-destructive/30 bg-destructive/10 flex items-center justify-center">
-                  <Lock className="w-2.5 h-2.5 text-destructive" />
+                <div className="flex h-4 w-4 items-center justify-center rounded border border-red-400 bg-red-50">
+                  <Lock className="h-2.5 w-2.5 text-red-600" />
                 </div>
-                <span className="text-xs text-muted-foreground">Bloqueado</span>
+                <span className="text-xs font-medium text-red-600">
+                  Bloqueado
+                </span>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Summary Panel */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Resumen del Mes</CardTitle>
           </CardHeader>
+
           <CardContent className="space-y-4">
-            <div className="p-4 rounded-lg bg-success/10">
-              <div className="flex items-center gap-2 text-sm text-success mb-1">
-                <CalendarCheck className="w-4 h-4" />
+            <div className="rounded-lg bg-emerald-50 p-4">
+              <div className="mb-1 flex items-center gap-2 text-sm text-emerald-700">
+                <CalendarCheck className="h-4 w-4" />
                 Días disponibles
               </div>
-              <p className="text-2xl font-semibold text-success">{stats.availableDays}</p>
-              <p className="text-xs text-muted-foreground">de {daysInMonth} días</p>
+
+              <p className="text-2xl font-semibold text-emerald-700">
+                {stats.availableDays}
+              </p>
+
+              <p className="text-xs text-muted-foreground">
+                de {daysInMonth} días
+              </p>
             </div>
 
-            <div className="p-4 rounded-lg bg-destructive/10">
-              <div className="flex items-center gap-2 text-sm text-destructive mb-1">
-                <Lock className="w-4 h-4" />
+            <div className="rounded-lg bg-red-50 p-4">
+              <div className="mb-1 flex items-center gap-2 text-sm text-red-700">
+                <Lock className="h-4 w-4" />
                 Días bloqueados
               </div>
-              <p className="text-2xl font-semibold text-destructive">{stats.blockedDays}</p>
-              <p className="text-xs text-muted-foreground">de {daysInMonth} días</p>
+
+              <p className="text-2xl font-semibold text-red-700">
+                {stats.blockedDays}
+              </p>
+
+              <p className="text-xs text-muted-foreground">
+                de {daysInMonth} días
+              </p>
             </div>
 
             {stats.nextBlocked && (
-              <div className="p-4 rounded-lg bg-warning/10">
-                <div className="flex items-center gap-2 text-sm text-warning-foreground mb-1">
-                  <AlertCircle className="w-4 h-4" />
+              <div className="rounded-lg bg-amber-50 p-4">
+                <div className="mb-1 flex items-center gap-2 text-sm text-amber-700">
+                  <AlertCircle className="h-4 w-4" />
                   Próximo bloqueo
                 </div>
-                <p className="text-sm font-medium">
-                  {new Date(stats.nextBlocked + "T12:00:00").toLocaleDateString("es-CO", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })}
+
+                <p className="text-sm font-medium text-foreground">
+                  {new Date(`${stats.nextBlocked}T12:00:00`).toLocaleDateString(
+                    "es-CO",
+                    {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                    }
+                  )}
                 </p>
               </div>
             )}
 
-            {/* Blocked days list */}
             {Object.keys(monthBlocks).length > 0 && (
               <div>
-                <p className="text-sm font-medium mb-2">Días bloqueados este mes:</p>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {Object.entries(monthBlocks).map(([date, reason]) => (
-                    <div
-                      key={date}
-                      className="flex items-center justify-between p-2 rounded bg-muted/50 text-sm"
-                    >
-                      <span>
-                        {new Date(date + "T12:00:00").toLocaleDateString("es-CO", {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </span>
-                      <Badge variant="secondary" className="text-xs">
-                        {reason}
-                      </Badge>
-                    </div>
-                  ))}
+                <p className="mb-2 text-sm font-medium">
+                  Días bloqueados este mes:
+                </p>
+
+                <div className="max-h-40 space-y-2 overflow-y-auto">
+                  {Object.keys(monthBlocks)
+                    .sort()
+                    .map((date) => (
+                      <div
+                        key={date}
+                        className="flex items-center justify-between rounded bg-muted/50 p-2 text-sm"
+                      >
+                        <span>
+                          {new Date(`${date}T12:00:00`).toLocaleDateString(
+                            "es-CO",
+                            {
+                              day: "numeric",
+                              month: "short",
+                            }
+                          )}
+                        </span>
+
+                        <Badge
+                          variant="secondary"
+                          className="bg-red-50 text-xs text-red-700"
+                        >
+                          Bloqueado
+                        </Badge>
+                      </div>
+                    ))}
                 </div>
               </div>
             )}
@@ -414,7 +601,6 @@ export function AvailabilityByDate() {
         </Card>
       </div>
 
-      {/* Block/Unblock Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -427,16 +613,20 @@ export function AvailabilityByDate() {
                   ? "Desbloquear día"
                   : `Desbloquear ${selectedDays.length} días`}
             </DialogTitle>
+
             <DialogDescription>
               {selectedDays.length === 1 ? (
                 <>
                   Fecha:{" "}
-                  {new Date(selectedDays[0] + "T12:00:00").toLocaleDateString("es-CO", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
+                  {new Date(`${selectedDays[0]}T12:00:00`).toLocaleDateString(
+                    "es-CO",
+                    {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    }
+                  )}
                 </>
               ) : (
                 <>{selectedDays.length} días seleccionados</>
@@ -445,64 +635,68 @@ export function AvailabilityByDate() {
           </DialogHeader>
 
           {dialogMode === "block" ? (
-            <div className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="block-reason" className="text-sm font-medium">
-                  Motivo del bloqueo
-                </Label>
-                <Select value={selectedReason} onValueChange={setSelectedReason}>
-                  <SelectTrigger id="block-reason" className="w-full mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {blockReasons.map((reason) => (
-                      <SelectItem key={reason} value={reason}>
-                        {reason}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedDays.length === 1 && getBlockReason(parseInt(selectedDays[0].split("-")[2])) && (
-                <div className="flex items-center gap-2">
-                  <Badge variant="destructive" className="text-xs">
-                    Actualmente bloqueado: {getBlockReason(parseInt(selectedDays[0].split("-")[2]))}
-                  </Badge>
-                </div>
-              )}
+            <div className="py-4">
+              <p className="text-sm text-muted-foreground">
+                Al bloquear esta fecha, la habitación no aparecerá disponible
+                para reservas en el sitio público.
+              </p>
             </div>
           ) : (
             <div className="py-4">
               <p className="text-sm text-muted-foreground">
                 {selectedDays.length === 1
-                  ? "¿Estás seguro de que deseas desbloquear este día?"
-                  : `¿Estás seguro de que deseas desbloquear ${selectedBlocked} días?`}
+                  ? "¿Estás seguro de que deseas habilitar este día nuevamente?"
+                  : `¿Estás seguro de que deseas habilitar ${selectedBlocked} días nuevamente?`}
               </p>
             </div>
           )}
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
             <Button
               variant="outline"
               onClick={() => setIsDialogOpen(false)}
+              disabled={isSaving}
               className="w-full sm:w-auto"
             >
               Cancelar
             </Button>
+
             {dialogMode === "block" ? (
               <Button
                 variant="destructive"
                 onClick={handleBlockDays}
+                disabled={isSaving}
                 className="w-full sm:w-auto"
               >
-                <Lock className="w-4 h-4 mr-2" />
-                Bloquear
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Bloqueando...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="mr-2 h-4 w-4" />
+                    Bloquear
+                  </>
+                )}
               </Button>
             ) : (
-              <Button onClick={handleUnblockDays} className="w-full sm:w-auto">
-                <Unlock className="w-4 h-4 mr-2" />
-                Desbloquear
+              <Button
+                onClick={handleUnblockDays}
+                disabled={isSaving}
+                className="w-full sm:w-auto"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Desbloqueando...
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="mr-2 h-4 w-4" />
+                    Desbloquear
+                  </>
+                )}
               </Button>
             )}
           </DialogFooter>

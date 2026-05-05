@@ -1,7 +1,13 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { useEffect, useMemo, useState } from "react"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,223 +27,314 @@ import {
   Calendar,
   Plus,
   Edit2,
-  Trash2,
   Moon,
   CheckCircle2,
   XCircle,
   AlertTriangle,
   CalendarRange,
   CalendarDays,
+  Loader2,
 } from "lucide-react"
-import {
-  initialSpecialSeasons,
-  type SpecialSeason,
-} from "@/lib/hotel-data"
-import { cn } from "@/lib/utils"
 
-export function SpecialSeasons() {
-  const [seasons, setSeasons] = useState<SpecialSeason[]>(initialSpecialSeasons)
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [editingSeason, setEditingSeason] = useState<SpecialSeason | null>(null)
-  const [formData, setFormData] = useState<Partial<SpecialSeason>>({
+import { cn } from "@/lib/utils"
+import {
+  listSeasonsService,
+  createSeasonService,
+  updateSeasonService,
+  updateSeasonStatusService,
+  type BackendSeason,
+  type SeasonType,
+} from "@/services/season.service"
+
+type FormData = {
+  name: string
+  description: string
+  keyDate: string
+  startDate: string
+  endDate: string
+  minimumNights: number
+  status: "ACTIVE" | "INACTIVE"
+}
+
+function emptyForm(): FormData {
+  return {
     name: "",
+    description: "",
     keyDate: "",
     startDate: "",
     endDate: "",
     minimumNights: 2,
-    description: "",
-    active: true,
-  })
+    status: "ACTIVE",
+  }
+}
+
+function normalizeDate(value?: string | null) {
+  if (!value) return ""
+  return value.split("T")[0]
+}
+
+function getNights(start: string, end: string) {
+  const startDate = new Date(`${start}T12:00:00`)
+  const endDate = new Date(`${end}T12:00:00`)
+
+  return Math.max(
+    1,
+    Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000)
+  )
+}
+
+function seasonApplies(season: BackendSeason, checkIn: string, checkOut: string) {
+  const checkInDate = new Date(`${checkIn}T12:00:00`)
+  const checkOutDate = new Date(`${checkOut}T12:00:00`)
+
+  if (season.type === "KEY_DATE" && season.keyDate) {
+    const keyDate = new Date(`${normalizeDate(season.keyDate)}T12:00:00`)
+    return keyDate >= checkInDate && keyDate < checkOutDate
+  }
+
+  if (season.type === "DATE_RANGE" && season.startDate && season.endDate) {
+    const start = new Date(`${normalizeDate(season.startDate)}T12:00:00`)
+    const end = new Date(`${normalizeDate(season.endDate)}T12:00:00`)
+    return checkInDate <= end && checkOutDate > start
+  }
+
+  return false
+}
+
+export function SpecialSeasons() {
+  const [seasons, setSeasons] = useState<BackendSeason[]>([])
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [editingSeason, setEditingSeason] = useState<BackendSeason | null>(null)
+  const [formData, setFormData] = useState<FormData>(emptyForm())
   const [dateType, setDateType] = useState<"single" | "range">("single")
 
-  // Simulator state
   const [checkIn, setCheckIn] = useState("")
   const [checkOut, setCheckOut] = useState("")
 
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadSeasons = async () => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const data = await listSeasonsService()
+      setSeasons(Array.isArray(data) ? data : [])
+    } catch (e: any) {
+      setError(e?.message ?? "No se pudieron cargar las temporadas")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadSeasons()
+  }, [])
+
   const resetForm = () => {
-    setFormData({
-      name: "",
-      keyDate: "",
-      startDate: "",
-      endDate: "",
-      minimumNights: 2,
-      description: "",
-      active: true,
-    })
+    setFormData(emptyForm())
     setDateType("single")
     setEditingSeason(null)
   }
 
-  const handleCreateSeason = () => {
-    const newSeason: SpecialSeason = {
-      id: `season-${Date.now()}`,
-      name: formData.name || "",
-      keyDate: dateType === "single" ? formData.keyDate : undefined,
-      startDate: dateType === "range" ? formData.startDate : undefined,
-      endDate: dateType === "range" ? formData.endDate : undefined,
-      minimumNights: formData.minimumNights || 2,
-      description: formData.description || "",
-      active: formData.active ?? true,
-    }
+  const buildPayload = () => {
+    const type: SeasonType = dateType === "single" ? "KEY_DATE" : "DATE_RANGE"
 
-    if (editingSeason) {
-      setSeasons((prev) =>
-        prev.map((s) => (s.id === editingSeason.id ? { ...newSeason, id: editingSeason.id } : s))
-      )
-    } else {
-      setSeasons((prev) => [...prev, newSeason])
+    return {
+      name: formData.name.trim(),
+      description: formData.description.trim(),
+      type,
+      keyDate: type === "KEY_DATE" ? formData.keyDate : null,
+      startDate: type === "DATE_RANGE" ? formData.startDate : null,
+      endDate: type === "DATE_RANGE" ? formData.endDate : null,
+      minimumNights: Number(formData.minimumNights || 1),
     }
-
-    setIsCreateDialogOpen(false)
-    resetForm()
   }
 
-  const handleEditSeason = (season: SpecialSeason) => {
+  const handleSaveSeason = async () => {
+    const payload = buildPayload()
+
+    if (!payload.name) return
+    if (payload.type === "KEY_DATE" && !payload.keyDate) return
+    if (payload.type === "DATE_RANGE" && (!payload.startDate || !payload.endDate)) return
+
+    setIsSaving(true)
+
+    try {
+      if (editingSeason) {
+        const updated = await updateSeasonService(editingSeason.id, payload)
+
+        setSeasons((prev) =>
+          prev.map((s) => (s.id === editingSeason.id ? updated : s))
+        )
+      } else {
+        const created = await createSeasonService(payload)
+        setSeasons((prev) => [created, ...prev])
+      }
+
+      setIsCreateDialogOpen(false)
+      resetForm()
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleEditSeason = (season: BackendSeason) => {
+    const isKeyDate = season.type === "KEY_DATE"
+
     setEditingSeason(season)
+    setDateType(isKeyDate ? "single" : "range")
+
     setFormData({
-      name: season.name,
-      keyDate: season.keyDate || "",
-      startDate: season.startDate || "",
-      endDate: season.endDate || "",
-      minimumNights: season.minimumNights,
-      description: season.description,
-      active: season.active,
+      name: season.name ?? "",
+      description: season.description ?? "",
+      keyDate: normalizeDate(season.keyDate),
+      startDate: normalizeDate(season.startDate),
+      endDate: normalizeDate(season.endDate),
+      minimumNights: Number(season.minimumNights ?? 2),
+      status: season.status ?? "ACTIVE",
     })
-    setDateType(season.keyDate ? "single" : "range")
+
     setIsCreateDialogOpen(true)
   }
 
-  const handleDeleteSeason = (seasonId: string) => {
-    setSeasons((prev) => prev.filter((s) => s.id !== seasonId))
-  }
+  const handleToggleActive = async (season: BackendSeason) => {
+    const nextStatus = season.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"
 
-  const handleToggleActive = (seasonId: string) => {
     setSeasons((prev) =>
-      prev.map((s) => (s.id === seasonId ? { ...s, active: !s.active } : s))
+      prev.map((s) => (s.id === season.id ? { ...s, status: nextStatus } : s))
     )
+
+    try {
+      await updateSeasonStatusService(season.id, nextStatus)
+    } catch {
+      setSeasons((prev) =>
+        prev.map((s) =>
+          s.id === season.id ? { ...s, status: season.status } : s
+        )
+      )
+    }
   }
 
-  // Simulator logic
   const simulationResult = useMemo(() => {
     if (!checkIn || !checkOut) return null
 
-    const checkInDate = new Date(checkIn + "T12:00:00")
-    const checkOutDate = new Date(checkOut + "T12:00:00")
+    const checkInDate = new Date(`${checkIn}T12:00:00`)
+    const checkOutDate = new Date(`${checkOut}T12:00:00`)
 
     if (checkOutDate <= checkInDate) {
-      return { valid: false, message: "La fecha de salida debe ser posterior a la entrada" }
+      return {
+        valid: false,
+        message: "La fecha de salida debe ser posterior a la entrada",
+      }
     }
 
-    const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24))
+    const nights = getNights(checkIn, checkOut)
 
-    // Check all active seasons
-    const violations: string[] = []
-    const activeSeasons = seasons.filter((s) => s.active)
-
-    for (const season of activeSeasons) {
-      let seasonApplies = false
-
-      if (season.keyDate) {
-        // Single date season - check if the key date falls within the reservation
-        const keyDate = new Date(season.keyDate + "T12:00:00")
-        if (keyDate >= checkInDate && keyDate < checkOutDate) {
-          seasonApplies = true
-        }
-      } else if (season.startDate && season.endDate) {
-        // Range season - check if any day of the range overlaps with the reservation
-        const rangeStart = new Date(season.startDate + "T12:00:00")
-        const rangeEnd = new Date(season.endDate + "T12:00:00")
-
-        // Check for overlap
-        if (checkInDate <= rangeEnd && checkOutDate > rangeStart) {
-          seasonApplies = true
-        }
-      }
-
-      if (seasonApplies && nights < season.minimumNights) {
-        violations.push(
-          `La reserva incluye ${season.name} y requiere mínimo ${season.minimumNights} noches (tienes ${nights})`
+    const violation = seasons
+      .filter((s) => s.status === "ACTIVE")
+      .find((season) => {
+        return (
+          seasonApplies(season, checkIn, checkOut) &&
+          nights < Number(season.minimumNights ?? 1)
         )
+      })
+
+    if (violation) {
+      return {
+        valid: false,
+        nights,
+        message: `La reserva incluye ${violation.name} y requiere mínimo ${violation.minimumNights} noche${
+          violation.minimumNights > 1 ? "s" : ""
+        }. Actualmente seleccionaste ${nights} noche${nights > 1 ? "s" : ""}.`,
       }
     }
 
-    if (violations.length > 0) {
-      return { valid: false, message: violations.join(". "), nights }
+    return {
+      valid: true,
+      nights,
+      message: `Reserva permitida (${nights} noche${nights > 1 ? "s" : ""})`,
     }
-
-    return { valid: true, message: `Reserva permitida (${nights} noche${nights > 1 ? "s" : ""})`, nights }
   }, [checkIn, checkOut, seasons])
 
-  const formatSeasonDates = (season: SpecialSeason): string => {
-    if (season.keyDate) {
-      return new Date(season.keyDate + "T12:00:00").toLocaleDateString("es-CO", {
-        day: "numeric",
-        month: "long",
-      })
+  const formatSeasonDates = (season: BackendSeason) => {
+    if (season.type === "KEY_DATE" && season.keyDate) {
+      return new Date(`${normalizeDate(season.keyDate)}T12:00:00`).toLocaleDateString(
+        "es-CO",
+        { day: "numeric", month: "long", year: "numeric" }
+      )
     }
+
     if (season.startDate && season.endDate) {
-      const start = new Date(season.startDate + "T12:00:00").toLocaleDateString("es-CO", {
-        day: "numeric",
-        month: "short",
-      })
-      const end = new Date(season.endDate + "T12:00:00").toLocaleDateString("es-CO", {
-        day: "numeric",
-        month: "short",
-      })
+      const start = new Date(`${normalizeDate(season.startDate)}T12:00:00`)
+        .toLocaleDateString("es-CO", { day: "numeric", month: "short" })
+
+      const end = new Date(`${normalizeDate(season.endDate)}T12:00:00`)
+        .toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })
+
       return `${start} - ${end}`
     }
-    return ""
+
+    return "Sin fecha"
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Calendar className="h-5 w-5 text-primary" />
                 Temporadas Especiales
               </CardTitle>
               <CardDescription>
-                Configura reglas de mínimo de noches para fechas especiales
+                Configura reglas de mínimo de noches para fechas especiales.
               </CardDescription>
             </div>
-            <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
-              setIsCreateDialogOpen(open)
-              if (!open) resetForm()
-            }}>
+
+            <Dialog
+              open={isCreateDialogOpen}
+              onOpenChange={(open) => {
+                setIsCreateDialogOpen(open)
+                if (!open) resetForm()
+              }}
+            >
               <DialogTrigger asChild>
                 <Button>
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className="mr-2 h-4 w-4" />
                   Nueva temporada
                 </Button>
               </DialogTrigger>
+
               <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                   <DialogTitle>
                     {editingSeason ? "Editar temporada" : "Crear temporada especial"}
                   </DialogTitle>
                   <DialogDescription>
-                    Define las reglas de mínimo de noches para esta temporada
+                    Define el mínimo de noches requerido para esta temporada.
                   </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
                   <div>
-                    <Label htmlFor="season-name">Nombre de la temporada</Label>
+                    <Label htmlFor="season-name">Nombre</Label>
                     <Input
                       id="season-name"
                       value={formData.name}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                      placeholder="ej: Navidad, Semana Santa"
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, name: e.target.value }))
+                      }
+                      placeholder="Ej: Semana Santa, Navidad, Año Nuevo"
                       className="mt-2"
                     />
                   </div>
 
                   <div>
-                    <Label className="mb-2 block">Tipo de fecha</Label>
+                    <Label className="mb-2 block">Tipo de temporada</Label>
                     <div className="flex gap-2">
                       <Button
                         type="button"
@@ -246,9 +343,10 @@ export function SpecialSeasons() {
                         onClick={() => setDateType("single")}
                         className="flex-1"
                       >
-                        <CalendarDays className="w-4 h-4 mr-2" />
+                        <CalendarDays className="mr-2 h-4 w-4" />
                         Fecha clave
                       </Button>
+
                       <Button
                         type="button"
                         variant={dateType === "range" ? "default" : "outline"}
@@ -256,8 +354,8 @@ export function SpecialSeasons() {
                         onClick={() => setDateType("range")}
                         className="flex-1"
                       >
-                        <CalendarRange className="w-4 h-4 mr-2" />
-                        Rango de fechas
+                        <CalendarRange className="mr-2 h-4 w-4" />
+                        Rango
                       </Button>
                     </div>
                   </div>
@@ -269,7 +367,12 @@ export function SpecialSeasons() {
                         id="key-date"
                         type="date"
                         value={formData.keyDate}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, keyDate: e.target.value }))}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            keyDate: e.target.value,
+                          }))
+                        }
                         className="mt-2"
                       />
                     </div>
@@ -281,17 +384,28 @@ export function SpecialSeasons() {
                           id="start-date"
                           type="date"
                           value={formData.startDate}
-                          onChange={(e) => setFormData((prev) => ({ ...prev, startDate: e.target.value }))}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              startDate: e.target.value,
+                            }))
+                          }
                           className="mt-2"
                         />
                       </div>
+
                       <div>
                         <Label htmlFor="end-date">Fecha fin</Label>
                         <Input
                           id="end-date"
                           type="date"
                           value={formData.endDate}
-                          onChange={(e) => setFormData((prev) => ({ ...prev, endDate: e.target.value }))}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              endDate: e.target.value,
+                            }))
+                          }
                           className="mt-2"
                         />
                       </div>
@@ -299,52 +413,60 @@ export function SpecialSeasons() {
                   )}
 
                   <div>
-                    <Label htmlFor="min-nights">Mínimo de noches requerido</Label>
+                    <Label htmlFor="min-nights">Mínimo de noches</Label>
                     <Input
                       id="min-nights"
                       type="number"
                       min={1}
                       value={formData.minimumNights}
                       onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, minimumNights: parseInt(e.target.value) || 2 }))
+                        setFormData((prev) => ({
+                          ...prev,
+                          minimumNights: Number(e.target.value || 1),
+                        }))
                       }
                       className="mt-2"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="description">Descripción o nota</Label>
+                    <Label htmlFor="description">Descripción</Label>
                     <Textarea
                       id="description"
                       value={formData.description}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          description: e.target.value,
+                        }))
+                      }
                       placeholder="Información adicional sobre esta temporada..."
                       className="mt-2"
                       rows={2}
                     />
                   </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div>
-                      <Label htmlFor="active-switch">Estado activo</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Las reglas inactivas no afectan las reservas
-                      </p>
-                    </div>
-                    <Switch
-                      id="active-switch"
-                      checked={formData.active}
-                      onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, active: checked }))}
-                    />
-                  </div>
                 </div>
 
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsCreateDialogOpen(false)}
+                    disabled={isSaving}
+                  >
                     Cancelar
                   </Button>
-                  <Button onClick={handleCreateSeason}>
-                    {editingSeason ? "Guardar cambios" : "Crear temporada"}
+
+                  <Button onClick={handleSaveSeason} disabled={isSaving}>
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Guardando...
+                      </>
+                    ) : editingSeason ? (
+                      "Guardar cambios"
+                    ) : (
+                      "Crear temporada"
+                    )}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -353,20 +475,31 @@ export function SpecialSeasons() {
         </CardHeader>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Seasons List */}
-        <div className="lg:col-span-2 space-y-4">
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4 text-sm text-red-700">{error}</CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
           <h3 className="text-sm font-medium text-muted-foreground">
             Temporadas configuradas ({seasons.length})
           </h3>
 
-          {seasons.length === 0 ? (
+          {isLoading ? (
+            <Card>
+              <CardContent className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Cargando temporadas...
+              </CardContent>
+            </Card>
+          ) : seasons.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <Calendar className="w-12 h-12 text-muted-foreground/50 mb-4" />
-                <p className="text-muted-foreground">No hay temporadas configuradas</p>
-                <p className="text-sm text-muted-foreground/70">
-                  Crea tu primera temporada especial
+                <Calendar className="mb-4 h-12 w-12 text-muted-foreground/50" />
+                <p className="text-muted-foreground">
+                  No hay temporadas configuradas.
                 </p>
               </CardContent>
             </Card>
@@ -377,54 +510,61 @@ export function SpecialSeasons() {
                   key={season.id}
                   className={cn(
                     "transition-all",
-                    !season.active && "opacity-60"
+                    season.status !== "ACTIVE" && "opacity-60"
                   )}
                 >
                   <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
                           <h4 className="font-semibold">{season.name}</h4>
+
                           <Badge
-                            variant={season.active ? "default" : "secondary"}
+                            variant={
+                              season.status === "ACTIVE" ? "default" : "secondary"
+                            }
                             className="text-xs"
                           >
-                            {season.active ? "Activa" : "Inactiva"}
+                            {season.status === "ACTIVE" ? "Activa" : "Inactiva"}
+                          </Badge>
+
+                          <Badge variant="outline" className="text-xs">
+                            {season.type === "KEY_DATE"
+                              ? "Fecha clave"
+                              : "Rango"}
                           </Badge>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-2">
+                        <div className="mb-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
+                            <Calendar className="h-4 w-4" />
                             {formatSeasonDates(season)}
                           </div>
+
                           <div className="flex items-center gap-1">
-                            <Moon className="w-4 h-4" />
-                            Mínimo {season.minimumNights} noche{season.minimumNights > 1 ? "s" : ""}
+                            <Moon className="h-4 w-4" />
+                            Mínimo {season.minimumNights} noche
+                            {season.minimumNights > 1 ? "s" : ""}
                           </div>
                         </div>
 
-                        <p className="text-sm text-muted-foreground">{season.description}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {season.description || "Sin descripción"}
+                        </p>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex shrink-0 items-center gap-2">
                         <Switch
-                          checked={season.active}
-                          onCheckedChange={() => handleToggleActive(season.id)}
+                          checked={season.status === "ACTIVE"}
+                          onCheckedChange={() => handleToggleActive(season)}
                         />
+
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEditSeason(season)}
                         >
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteSeason(season.id)}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
+                          <Edit2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
@@ -435,17 +575,17 @@ export function SpecialSeasons() {
           )}
         </div>
 
-        {/* Simulator */}
-        <Card className="h-fit sticky top-24">
+        <Card className="h-fit lg:sticky lg:top-24">
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <CalendarRange className="w-5 h-5 text-primary" />
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CalendarRange className="h-5 w-5 text-primary" />
               Simulador de Reserva
             </CardTitle>
             <CardDescription>
-              Verifica si una reserva cumple las reglas
+              Verifica si una reserva cumple las reglas.
             </CardDescription>
           </CardHeader>
+
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="check-in">Fecha de entrada</Label>
@@ -472,28 +612,34 @@ export function SpecialSeasons() {
             {simulationResult && (
               <div
                 className={cn(
-                  "p-4 rounded-lg",
+                  "rounded-lg border p-4",
                   simulationResult.valid
-                    ? "bg-success/10 border border-success/30"
-                    : "bg-destructive/10 border border-destructive/30"
+                    ? "border-emerald-300 bg-emerald-50"
+                    : "border-red-300 bg-red-50"
                 )}
               >
                 <div className="flex items-start gap-3">
                   {simulationResult.valid ? (
-                    <CheckCircle2 className="w-5 h-5 text-success shrink-0 mt-0.5" />
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
                   ) : (
-                    <XCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                    <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
                   )}
+
                   <div>
                     <p
                       className={cn(
-                        "font-medium text-sm",
-                        simulationResult.valid ? "text-success" : "text-destructive"
+                        "text-sm font-medium",
+                        simulationResult.valid
+                          ? "text-emerald-700"
+                          : "text-red-700"
                       )}
                     >
-                      {simulationResult.valid ? "Reserva permitida" : "Reserva no permitida"}
+                      {simulationResult.valid
+                        ? "Reserva permitida"
+                        : "Reserva no permitida"}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
+
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {simulationResult.message}
                     </p>
                   </div>
@@ -501,73 +647,23 @@ export function SpecialSeasons() {
               </div>
             )}
 
-            {/* Example scenarios */}
-            <div className="pt-4 border-t">
-              <p className="text-xs font-medium text-muted-foreground mb-3">
-                Ejemplos para probar:
+            <div className="border-t pt-4">
+              <p className="mb-3 text-xs font-medium text-muted-foreground">
+                Ejemplo rápido:
               </p>
-              <div className="space-y-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start text-xs h-auto py-2"
-                  onClick={() => {
-                    setCheckIn("2026-12-23")
-                    setCheckOut("2026-12-25")
-                  }}
-                >
-                  <AlertTriangle className="w-3 h-3 mr-2 text-warning" />
-                  23-25 dic (2 noches - NO válido)
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start text-xs h-auto py-2"
-                  onClick={() => {
-                    setCheckIn("2026-12-23")
-                    setCheckOut("2026-12-26")
-                  }}
-                >
-                  <CheckCircle2 className="w-3 h-3 mr-2 text-success" />
-                  23-26 dic (3 noches - válido)
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start text-xs h-auto py-2"
-                  onClick={() => {
-                    setCheckIn("2026-12-30")
-                    setCheckOut("2027-01-01")
-                  }}
-                >
-                  <AlertTriangle className="w-3 h-3 mr-2 text-warning" />
-                  30 dic - 1 ene (2 noches - NO válido)
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start text-xs h-auto py-2"
-                  onClick={() => {
-                    setCheckIn("2026-12-30")
-                    setCheckOut("2027-01-02")
-                  }}
-                >
-                  <CheckCircle2 className="w-3 h-3 mr-2 text-success" />
-                  30 dic - 2 ene (3 noches - válido)
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start text-xs h-auto py-2"
-                  onClick={() => {
-                    setCheckIn("2026-04-03")
-                    setCheckOut("2026-04-04")
-                  }}
-                >
-                  <AlertTriangle className="w-3 h-3 mr-2 text-warning" />
-                  3-4 abril (1 noche - Semana Santa NO válido)
-                </Button>
-              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-auto w-full justify-start py-2 text-xs"
+                onClick={() => {
+                  setCheckIn("2026-12-23")
+                  setCheckOut("2026-12-25")
+                }}
+              >
+                <AlertTriangle className="mr-2 h-3 w-3 text-amber-600" />
+                23-25 dic
+              </Button>
             </div>
           </CardContent>
         </Card>

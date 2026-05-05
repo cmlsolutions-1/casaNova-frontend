@@ -14,6 +14,8 @@ import Link from "next/link"
 import {
   listAvailableRoomsPublicService,
   getRoomDailyPricesPublicService,
+  getRoomAvailabilityPublicService,
+  type RoomAvailabilityDay,
   type BackendRoom,
   type RoomDailyPrice,
 } from "@/services/room.service"
@@ -21,7 +23,13 @@ import {
 import { parseISO, format } from "date-fns"
 import { es } from "date-fns/locale"
 import { calculateRoomPrice } from "@/utils/price-calculator"
+import { listActiveSeasonsPublicService } from "@/services/season.service"
+import { validateSeasonMinimumNights } from "@/utils/season-validator"
 
+
+function hasBlockedNight(availability: RoomAvailabilityDay[]) {
+  return availability.some((day) => day.isAvailable === false)
+}
 
 function getNightsBetween(start: string, end: string) {
   const startDate = new Date(`${start}T12:00:00`)
@@ -109,6 +117,24 @@ function SearchResults() {
 
   ;(async () => {
     try {
+       const seasons = await listActiveSeasonsPublicService()
+
+        const seasonValidation = validateSeasonMinimumNights({
+          start,
+          end,
+          seasons,
+        })
+
+        if (!seasonValidation.valid) {
+          if (!alive) return
+
+          setError(seasonValidation.message)
+          setRooms([])
+          setDailyPricesByRoom({})
+          setLoading(false)
+          return
+        }
+      
       const data = await listAvailableRoomsPublicService({
         start,
         end,
@@ -117,11 +143,30 @@ function SearchResults() {
 
       if (!alive) return
 
-      const filtered = (data ?? [])
-        .filter((r) => r.status === "ACTIVE")
-        .filter((r) => !selectedIds.has(String(r.id)))
+      const activeRooms = (data ?? [])
+      .filter((r) => r.status === "ACTIVE")
+      .filter((r) => !selectedIds.has(String(r.id)))
 
-      setRooms(filtered)
+    const availabilityEntries = await Promise.all(
+      activeRooms.map(async (room) => {
+        const availability = await getRoomAvailabilityPublicService({
+          roomId: room.id,
+          start,
+          end,
+        })
+
+        return [room.id, availability] as const
+      })
+    )
+
+    const availabilityByRoom = Object.fromEntries(availabilityEntries)
+
+    const filtered = activeRooms.filter((room) => {
+      const availability = availabilityByRoom[room.id] ?? []
+      return !hasBlockedNight(availability)
+    })
+
+    setRooms(filtered)
 
       const pricesEntries = await Promise.all(
         filtered.map(async (room) => {
