@@ -378,7 +378,7 @@ export default function BookingConfirmPage() {
     }
 
     // ==========================================
-    // ✅ EXTRA BOOKING (DAY_PASS / EVENT_HALL)
+    // EXTRA BOOKING (DAY_PASS / EVENT_HALL)
     // ==========================================
     if (isExtraBooking && extraBooking) {
       const dateParts = extraBooking.date.split("-")
@@ -1112,6 +1112,12 @@ export default function BookingConfirmPage() {
                     className="inline-block text-sm font-medium text-accent hover:underline"
                   >
                     Ver términos y condiciones
+                  </Link>
+                  <Link
+                    href="/booking/politics"
+                    className="inline-block text-sm font-medium text-accent hover:underline"
+                  >
+                    Politicas de cumplimientos del Hotel
                   </Link>
                 </div>
               </div>
