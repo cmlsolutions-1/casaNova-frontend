@@ -10,11 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Eye, Filter, Phone } from 'lucide-react';
+import { Eye, Filter, MessageCircle } from 'lucide-react';
 import { authStorage } from "@/lib/auth-storage"
 
 import {
   listReservationsService,
+  resendReservationNotificationService,
   updateReservationByAdminService,
   type ReservationListItem,
 } from "@/services/reservation.service"
@@ -53,12 +54,19 @@ const statusClassName = (s: string) => {
   return "bg-muted text-muted-foreground border border-border"
 }
 
+type NotificationFeedback = {
+  type: "success" | "warning" | "error"
+  message: string
+} | null
+
 export default function AdminReservationsPage() {
   const { adminAuth } = useBooking()
 
   const [reservations, setReservations] = useState<ReservationListItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notificationFeedback, setNotificationFeedback] = useState<NotificationFeedback>(null)
+  const [resendingReservationCode, setResendingReservationCode] = useState<string | null>(null)
 
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterDate, setFilterDate] = useState("")
@@ -102,6 +110,49 @@ export default function AdminReservationsPage() {
     return "Sin detalle"
   }
 
+  const resendNotification = async (res: ReservationListItem) => {
+    const reservationCode = res.reservationCode
+
+    if (!reservationCode) {
+      setNotificationFeedback({
+        type: "error",
+        message: "Esta reserva no tiene código para reenviar la notificación.",
+      })
+      return
+    }
+
+    const reservationCodeText = String(reservationCode)
+
+    try {
+      setResendingReservationCode(reservationCodeText)
+      setNotificationFeedback(null)
+
+      const response = await resendReservationNotificationService(reservationCodeText)
+      const senderStatus = response?.data?.sender?.status
+
+      if (senderStatus === "QR") {
+        setNotificationFeedback({
+          type: "warning",
+          message:
+            "No se pudo enviar la notificación: el WhatsApp del hotel está desvinculado y requiere escanear el QR.",
+        })
+        return
+      }
+
+      setNotificationFeedback({
+        type: "success",
+        message: `Notificación reenviada a ${response?.data?.recipientPhoneNumber || "el cliente"}.`,
+      })
+    } catch (e: any) {
+      setNotificationFeedback({
+        type: "error",
+        message: e?.message || "No se pudo reenviar la notificación de WhatsApp.",
+      })
+    } finally {
+      setResendingReservationCode(null)
+    }
+  }
+
   useEffect(() => {
     loadReservations()
   }, [])
@@ -136,6 +187,19 @@ export default function AdminReservationsPage() {
           {isEmployee ? "Vista de reservas (solo lectura)" : "Gestiona las reservas del sistema"}
         </p>
         {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+        {notificationFeedback && (
+          <div
+            className={`mt-3 rounded-lg border p-3 text-sm ${
+              notificationFeedback.type === "success"
+                ? "border-green-300 bg-green-100 text-green-800"
+                : notificationFeedback.type === "warning"
+                  ? "border-yellow-300 bg-yellow-100 text-yellow-800"
+                  : "border-destructive/30 bg-destructive/10 text-destructive"
+            }`}
+          >
+            {notificationFeedback.message}
+          </div>
+        )}
       </div>
 
       <Card className="border-border">
@@ -220,12 +284,15 @@ export default function AdminReservationsPage() {
                 <th className="pb-3 pr-4 font-medium">Fechas</th>
                 <th className="pb-3 pr-4 font-medium">Total</th>
                 <th className="pb-3 pr-4 font-medium">Estado</th>
+                <th className="pb-3 pr-4 font-medium">Notificación</th>
                 <th className="pb-3 font-medium">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((res) => {
                 const detailLabel = getReservationDetailLabel(res)
+                const reservationCode = res.reservationCode ? String(res.reservationCode) : ""
+                const isResending = reservationCode === resendingReservationCode
 
                 return (
                   <tr key={res.id} className="border-b border-border/50 last:border-0">
@@ -258,6 +325,24 @@ export default function AdminReservationsPage() {
                       <Badge className={statusClassName(res.status)}>
                         {statusLabels[res.status] || res.status}
                       </Badge>
+                    </td>
+                    <td className="py-3 pr-4">
+                      {!isEmployee ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-green-700 hover:bg-green-50 hover:text-green-800"
+                          onClick={() => resendNotification(res)}
+                          disabled={isResending || !reservationCode}
+                          title="Reenviar notificación por WhatsApp"
+                          aria-label="Reenviar notificación por WhatsApp"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          <span className="sr-only">Reenviar WhatsApp</span>
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Solo lectura</span>
+                      )}
                     </td>
                     <td className="py-3">
                       <div className="flex items-center gap-1">

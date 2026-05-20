@@ -204,6 +204,47 @@ export async function listReservationsService(params?: ListReservationsParams) {
   })
 }
 
+export type ResendReservationNotificationResponse = {
+  ok: boolean
+  message: string
+  data: {
+    sender: {
+      id: number
+      displayName: string
+      phoneNumber: string
+      normalizedPhoneNumber: string
+      authFolder: string
+      status: string
+      lastDisconnectReason: any
+      createdAt: string
+      updatedAt: string
+    }
+    recipientPhoneNumber: string
+    messageId: string
+    sentAt: string
+  }
+  errors: any
+  meta: {
+    path: string
+    method: string
+    timestamp: string
+    statusCode: number
+  }
+}
+
+export async function resendReservationNotificationService(
+  reservationCode: string | number,
+) {
+  return apiFetch<ResendReservationNotificationResponse>(
+    `/api/reservations/resend-notification/${encodeURIComponent(String(reservationCode))}`,
+    {
+      method: "POST",
+      auth: true,
+      rawResponse: true,
+    },
+  )
+}
+
 export type UpdateReservationByAdminBody = {
   startDate: string
   endDate: string

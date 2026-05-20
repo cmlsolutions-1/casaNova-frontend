@@ -183,10 +183,18 @@ export default function AdminAmenitiesPage() {
                       }
                       disabled={changingId === amenity.id}
                       onClick={async () => {
+                        const nextStatus = isActive ? "INACTIVE" : "ACTIVE"
                         setChangingId(amenity.id)
+                        setError(null)
                         try {
-                          await updateAmenityStatusService(amenity.id, isActive ? "INACTIVE" : "ACTIVE")
-                          await loadAmenities()
+                          await updateAmenityStatusService(amenity.id, nextStatus)
+                          setAmenities((current) =>
+                            current.map((item) =>
+                              item.id === amenity.id
+                                ? { ...item, status: nextStatus }
+                                : item,
+                            ),
+                          )
                         } catch (e: any) {
                           setError(e?.message ?? "Error cambiando estado")
                         } finally {
