@@ -81,9 +81,12 @@ function RoomForm({
   const [uploadedImageIds, setUploadedImageIds] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [existingImages, setExistingImages] = useState(room?.images ?? [])
+  const [newImagesFirst, setNewImagesFirst] = useState(false)
 
   const makeLocalImageCover = (id: string) => {
   const index = images.findIndex((img) => img.id === id)
+    if (index < 0) return
+    setNewImagesFirst(true)
     if (index <= 0) return
 
     setImages((prev) => moveItemToFront(prev, id))
@@ -98,6 +101,7 @@ function RoomForm({
   }
 
   const makeExistingImageCover = (id: string) => {
+    setNewImagesFirst(false)
     setExistingImages((prev) => moveItemToFront(prev, id))
   }
 
@@ -181,6 +185,7 @@ function RoomForm({
     setExistingImages(sortedImages) //Usar imágenes ordenadas
     setImages([])
     setUploadedImageIds([])
+    setNewImagesFirst(false)
   }, [room])
 
   useEffect(() => {
@@ -198,7 +203,7 @@ function RoomForm({
   const handlePickFiles = (filesList: FileList | null) => {
   if (!filesList) return
 
-  const availableSlots = MAX_ROOM_IMAGES - images.length
+  const availableSlots = MAX_ROOM_IMAGES - existingImages.length - images.length
 
   if (availableSlots <= 0) {
     setError(`Solo puedes cargar máximo ${MAX_ROOM_IMAGES} imágenes.`)
@@ -230,12 +235,18 @@ function RoomForm({
 }
 
 const removeLocalImage = (id: string) => {
+  if (images.length <= 1) setNewImagesFirst(false)
+
   setImages((prev) => {
     const target = prev.find((x) => x.id === id)
     if (target) URL.revokeObjectURL(target.preview)
     return prev.filter((x) => x.id !== id)
   })
   setUploadedImageIds([])
+}
+
+const removeExistingImage = (id: string) => {
+  setExistingImages((prev) => prev.filter((img) => img.id !== id))
 }
 
 const uploadSelectedImages = async () => {
@@ -269,12 +280,16 @@ const uploadSelectedImages = async () => {
       throw new Error("Debes subir las imágenes antes de crear la habitación.")
     }
 
+    if (room?.id && images.length > 0 && uploadedImageIds.length !== images.length) {
+      throw new Error("Debes subir las imágenes nuevas antes de guardar los cambios.")
+    }
+
     const existingImageIds = existingImages.map((img) => img.id)
 
     const imagesIdsToSend = room?.id
-      ? uploadedImageIds.length > 0
-        ? uploadedImageIds
-        : existingImageIds
+      ? newImagesFirst
+        ? [...uploadedImageIds, ...existingImageIds]
+        : [...existingImageIds, ...uploadedImageIds]
       : uploadedImageIds
 
        // Derivar coverImageId: siempre es el primero
@@ -491,7 +506,7 @@ const uploadSelectedImages = async () => {
           </Button>
 
           <Badge variant="outline" className="text-xs">
-            Seleccionadas: {images.length}/{MAX_ROOM_IMAGES}
+            Total: {existingImages.length + images.length}/{MAX_ROOM_IMAGES}
           </Badge>
 
           <Badge variant="outline" className="text-xs">
@@ -501,8 +516,56 @@ const uploadSelectedImages = async () => {
 
         {images.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            Las imágenes nuevas reemplazarán las actuales. Puedes elegir cuál será la portada.
+            Las imágenes nuevas se agregarán a las actuales. Para reemplazar una imagen, elimínala primero.
           </p>
+        )}
+
+        {existingImages.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Imágenes actuales ({existingImages.length}). La primera es la portada actual.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {existingImages.map((img, index) => (
+                <div
+                  key={img.id}
+                  className="group relative aspect-square overflow-hidden rounded-lg border bg-muted"
+                >
+                  <img
+                    src={img.url}
+                    alt="Habitación"
+                    className="h-full w-full object-cover"
+                  />
+
+                  {index === 0 && !newImagesFirst && (
+                    <Badge className="absolute left-2 top-2 border border-yellow-300 bg-yellow-100 text-yellow-800">
+                      Portada
+                    </Badge>
+                  )}
+
+                  <div className="absolute right-2 top-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => makeExistingImageCover(img.id)}
+                      className="rounded-md bg-black/70 px-2 py-1 text-[10px] text-white transition hover:bg-black"
+                    >
+                      Portada
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => removeExistingImage(img.id)}
+                      className="rounded-full bg-destructive p-1.5 text-destructive-foreground opacity-100 transition-opacity sm:opacity-0 group-hover:opacity-100"
+                      aria-label="Eliminar imagen actual"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {images.length > 0 && (
@@ -517,7 +580,7 @@ const uploadSelectedImages = async () => {
                 >
                   <img src={img.preview} alt={img.file.name} className="h-full w-full object-cover" />
 
-                  {index === 0 && (
+                  {index === 0 && (newImagesFirst || existingImages.length === 0) && (
                     <Badge className="absolute left-2 top-2 border border-yellow-300 bg-yellow-100 text-yellow-800">
                       Portada
                     </Badge>
@@ -548,47 +611,6 @@ const uploadSelectedImages = async () => {
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {existingImages.length > 0 && images.length === 0 && (
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              Imágenes actuales ({existingImages.length}). La primera es la portada actual.
-            </p>
-
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {existingImages.map((img, index) => (
-                <div
-                  key={img.id}
-                  className="group relative aspect-square overflow-hidden rounded-lg border bg-muted"
-                >
-                  <img
-                    src={img.url}
-                    alt="Habitación"
-                    className="h-full w-full object-cover"
-                  />
-
-                  {index === 0 && (
-                    <Badge className="absolute left-2 top-2 border border-yellow-300 bg-yellow-100 text-yellow-800">
-                      Portada
-                    </Badge>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => makeExistingImageCover(img.id)}
-                    className="absolute right-2 top-2 rounded-md bg-black/70 px-2 py-1 text-[10px] text-white transition hover:bg-black"
-                  >
-                    Portada
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              Si quieres cambiarlas, selecciona nuevas imágenes, ordénalas y vuelve a subir.
-            </p>
           </div>
         )}
       </div>
@@ -719,7 +741,7 @@ export default function AdminRoomsPage() {
           const isActive = room.status === "ACTIVE"
 
           return (
-            <Card key={room.id} className="overflow-hidden border-border">
+            <Card key={room.id} className="flex h-full flex-col overflow-hidden border-border">
               <div className="relative h-40">
                 <img src={img} alt={room.nameRoom} className="h-full w-full object-cover" />
 
@@ -746,68 +768,70 @@ export default function AdminRoomsPage() {
                 </div>
               </div>
 
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0">
-                    <h3 className="font-serif font-semibold text-foreground truncate">
-                      Hab. {room.nameRoom}
-                    </h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{room.description}</p>
+              <CardContent className="flex flex-1 flex-col p-4">
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <h3 className="font-serif font-semibold text-foreground truncate">
+                        Hab. {room.nameRoom}
+                      </h3>
+                      <p className="text-sm text-muted-foreground line-clamp-2">{room.description}</p>
+                    </div>
+
+                    <span className="text-lg font-bold text-accent whitespace-nowrap">
+                      {formatCurrencyCOP(room.price)}
+                      <span className="text-xs text-muted-foreground">/noche</span>
+                    </span>
                   </div>
 
-                  <span className="text-lg font-bold text-accent whitespace-nowrap">
-                    {formatCurrencyCOP(room.price)}
-                    <span className="text-xs text-muted-foreground">/noche</span>
-                  </span>
-                </div>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1 flex-wrap">
+                    <div className="flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      <span>{room.capacity}</span>
+                    </div>
 
-                <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1 flex-wrap">
-                  <div className="flex items-center gap-1">
-                    <Users className="h-4 w-4" />
-                    <span>{room.capacity}</span>
-                  </div>
+                    <div className="flex items-center gap-1">
+                      <BedSingle className="h-4 w-4" />
+                      <span>{room.singleBeds}</span>
+                    </div>
 
-                  <div className="flex items-center gap-1">
-                    <BedSingle className="h-4 w-4" />
-                    <span>{room.singleBeds}</span>
-                  </div>
+                    <div className="flex items-center gap-1">
+                      <BedDouble className="h-4 w-4" />
+                      <span>{room.doubleBeds}</span>
+                    </div>
 
-                  <div className="flex items-center gap-1">
-                    <BedDouble className="h-4 w-4" />
-                    <span>{room.doubleBeds}</span>
-                  </div>
-
-                  <Badge variant="secondary" className="text-xs">
-                    {TYPE_LABEL[room.type] ?? room.type}
-                  </Badge>
-
-                  {(room.cabin ?? 0) > 0 && (
-                    <Badge variant="outline" className="text-xs">
-                      Camarote: {room.cabin}
+                    <Badge variant="secondary" className="text-xs">
+                      {TYPE_LABEL[room.type] ?? room.type}
                     </Badge>
-                  )}
-                  {(room.extraDouble ?? 0) > 0 && (
-                    <Badge variant="outline" className="text-xs">
-                      Doble extra: {room.extraDouble}
-                    </Badge>
-                  )}
-                </div>
 
-                {room.amenities?.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {room.amenities.slice(0, 8).map((a) => (
-                      <Badge key={a.id} variant="outline" className="text-xs">
-                        {a.name}
+                    {(room.cabin ?? 0) > 0 && (
+                      <Badge variant="outline" className="text-xs">
+                        Camarote: {room.cabin}
                       </Badge>
-                    ))}
+                    )}
+                    {(room.extraDouble ?? 0) > 0 && (
+                      <Badge variant="outline" className="text-xs">
+                        Doble extra: {room.extraDouble}
+                      </Badge>
+                    )}
                   </div>
-                )}
+
+                  {room.amenities?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {room.amenities.slice(0, 8).map((a) => (
+                        <Badge key={a.id} variant="outline" className="text-xs">
+                          {a.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 {canManageRooms && (
-                  <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  <div className="mt-auto flex flex-wrap justify-center gap-2 pt-4">
                     <Button
-                      variant="outline"
                       size="sm"
+                      className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
                       onClick={async () => {
                         const full = await getRoomService(room.id)
                         setEditingRoom(full)
@@ -838,7 +862,11 @@ export default function AdminRoomsPage() {
 
                     <Button
                       size="sm"
-                      variant="outline"
+                      className={
+                        room.isBusy
+                          ? "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:text-sky-800"
+                          : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800"
+                      }
                       disabled={changingId === room.id}
                       onClick={async () => {
                         setChangingId(room.id)

@@ -45,8 +45,19 @@ import {
   getRoomAvailabilityPublicService,
   updateRoomAvailabilityService,
   type BackendRoom,
+  type RoomType,
   type RoomAvailabilityDay,
 } from "@/services/room.service"
+
+const ROOM_TYPE_LABEL: Record<RoomType, string> = {
+  SIMPLE: "Sencilla",
+  DOUBLE: "Doble",
+  TRIPLE: "Triple",
+  QUADRUPLE: "Cuádruple",
+  QUINTUPLE: "Quíntuple",
+  SEXTUPLE: "Séxtuple",
+  VIP: "VIP",
+}
 
 const formatDate = (date: Date) => {
   const year = date.getFullYear()
@@ -342,7 +353,7 @@ export function AvailabilityByDate() {
                 <SelectContent>
                   {rooms.map((r) => (
                     <SelectItem key={r.id} value={r.id}>
-                      {r.nameRoom} ({r.type})
+                      {r.nameRoom} ({ROOM_TYPE_LABEL[r.type] ?? r.type})
                     </SelectItem>
                   ))}
                 </SelectContent>

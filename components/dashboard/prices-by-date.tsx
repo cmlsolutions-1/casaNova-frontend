@@ -46,8 +46,19 @@ import {
   getRoomDailyPricesService,
   updateRoomDailyPricesService,
   type BackendRoom,
+  type RoomType,
   type RoomDailyPrice,
 } from "@/services/room.service"
+
+const ROOM_TYPE_LABEL: Record<RoomType, string> = {
+  SIMPLE: "Sencilla",
+  DOUBLE: "Doble",
+  TRIPLE: "Triple",
+  QUADRUPLE: "Cuádruple",
+  QUINTUPLE: "Quíntuple",
+  SEXTUPLE: "Séxtuple",
+  VIP: "VIP",
+}
 
 const formatCOP = (value: number) =>
   new Intl.NumberFormat("es-CO", {
@@ -363,7 +374,7 @@ export function PricesByDate() {
                 <SelectContent>
                   {rooms.map((r) => (
                     <SelectItem key={r.id} value={r.id}>
-                      {r.nameRoom} ({r.type}) - {formatCOP(r.price)}/noche
+                      {r.nameRoom} ({ROOM_TYPE_LABEL[r.type] ?? r.type}) - {formatCOP(r.price)}/noche
                     </SelectItem>
                   ))}
                 </SelectContent>
